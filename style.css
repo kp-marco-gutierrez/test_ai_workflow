@@ -11,9 +11,23 @@ h1 { font-size: 1.25rem; font-weight: 700; }
   display: flex;
   flex-direction: column;
   gap: 8px;
+  transition: background 0.15s, outline 0.15s;
+}
+.column.drag-over {
+  background: rgba(255,255,255,.28);
+  outline: 2px dashed rgba(255,255,255,.6);
+  outline-offset: -2px;
 }
 .column-header { font-size: 1rem; font-weight: 600; }
 .cards-list { display: flex; flex-direction: column; gap: 6px; }
+.cards-list:empty::before {
+  content: 'No cards in this column';
+  display: block;
+  color: rgba(255,255,255,.6);
+  font-size: 0.82rem;
+  padding: 6px 0;
+  text-align: center;
+}
 .card {
   background: #fff;
   color: #333;
@@ -24,6 +38,12 @@ h1 { font-size: 1.25rem; font-weight: 700; }
   flex-direction: column;
   gap: 4px;
   cursor: grab;
+  transition: opacity 0.15s, box-shadow 0.15s;
+}
+.card.dragging {
+  opacity: 0.45;
+  box-shadow: 0 6px 16px rgba(0,0,0,.35);
+  cursor: grabbing;
 }
 .card-title {
   display: block;
@@ -39,6 +59,17 @@ h1 { font-size: 1.25rem; font-weight: 700; }
   border: 1px solid #ccc;
   cursor: default;
 }
+button.delete {
+  background: #e04040;
+  border: none;
+  border-radius: 3px;
+  padding: 3px 8px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.75rem;
+  align-self: flex-end;
+}
+button.delete:hover { background: #c03030; }
 .add-card-form { display: flex; flex-direction: column; gap: 6px; }
 input.card-input { border: none; border-radius: 4px; padding: 6px 8px; font-size: 0.875rem; width: 100%; }
 button.add-card {
@@ -61,3 +92,12 @@ button.add-card:hover { background: rgba(255,255,255,.4); }
   display: none;
 }
 .error.visible { display: block; }
+.rename-error {
+  background: #ffebe8;
+  color: #ae2a19;
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 0.8rem;
+  display: none;
+}
+.rename-error.visible { display: block; }
