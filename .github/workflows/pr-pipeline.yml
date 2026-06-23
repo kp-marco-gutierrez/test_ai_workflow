@@ -37,20 +37,30 @@ jobs:
     name: Sync with main (auto-resolve conflicts before merge)
     if: contains(github.event.pull_request.labels.*.name, 'ai-tests')
     runs-on: ubuntu-latest
+    outputs:
+      refreshed: ${{ steps.s.outputs.refreshed }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
+          # Push with a PAT (if configured) so the refresh re-triggers a fresh
+          # run on the up-to-date branch — where claude-code-action's
+          # workflow-validation guard passes. A GITHUB_TOKEN push would NOT
+          # re-trigger, leaving Claude self-skipping on the stale workflow.
+          token: ${{ secrets.PIPELINE_PAT || github.token }}
       - name: Merge main into the PR branch
+        id: s
         env:
           GH_TOKEN: ${{ github.token }}
+          HAS_PAT: ${{ secrets.PIPELINE_PAT != '' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main
           if git merge-base --is-ancestor origin/main HEAD; then
             echo "Branch already contains main — nothing to sync."
+            echo "refreshed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "Branch is behind main — merging (conflicts resolved toward main)."
@@ -63,12 +73,20 @@ jobs:
             exit 1
           fi
           git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
-          bash scripts/retry.sh gh pr comment ${{ github.event.pull_request.number }} -b "🔀 **Synced with \`main\`** and auto-resolved conflicts (favoring main). The pipeline re-applies this PR's changes (driven by its tests) and re-verifies before merge." || true
+          if [ "$HAS_PAT" = "true" ]; then
+            # PAT push re-triggers a fresh run on the current pipeline; let it
+            # take over and skip the rest of THIS (stale-workflow) run.
+            echo "refreshed=true" >> "$GITHUB_OUTPUT"
+            bash scripts/retry.sh gh pr comment ${{ github.event.pull_request.number }} -b "🔀 **Synced with \`main\`** (auto-resolved conflicts toward main). A fresh pipeline run is starting on the updated branch." || true
+          else
+            echo "::warning::PIPELINE_PAT not set — branch updated but the run was not re-triggered, so Claude may self-skip on the stale workflow. Add the PIPELINE_PAT secret for reliable auto-refresh."
+            echo "refreshed=false" >> "$GITHUB_OUTPUT"
+          fi
 
   tests:
     name: Run tests (deterministic)
     needs: sync
-    if: contains(github.event.pull_request.labels.*.name, 'ai-tests')
+    if: contains(github.event.pull_request.labels.*.name, 'ai-tests') && needs.sync.outputs.refreshed != 'true'
     runs-on: ubuntu-latest
     outputs:
       passed: ${{ steps.run.outputs.passed }}
