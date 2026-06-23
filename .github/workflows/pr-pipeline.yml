@@ -91,6 +91,18 @@ jobs:
           fi
           echo "Tests fail as required on the first run."
 
+      - name: Comment — tests result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          pr=${{ github.event.pull_request.number }}
+          if [ "${{ steps.run.outputs.passed }}" = "true" ]; then
+            gh pr comment "$pr" -b "🧪 **Tests** passed (deterministic gate) → proceeding to code review. ([run]($RUN_URL))"
+          else
+            gh pr comment "$pr" -b "🧪 **Tests** failing as expected (no/incomplete implementation) → Claude will implement. ([run]($RUN_URL))"
+          fi
+
       - name: Upload test output
         if: always()
         uses: actions/upload-artifact@v4
@@ -124,6 +136,11 @@ jobs:
         id: log
         run: |
           { echo "log<<TESTLOG_EOF"; tail -n 200 test-output.txt; echo "TESTLOG_EOF"; } >> "$GITHUB_OUTPUT"
+      - name: Comment — develop started
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: gh pr comment ${{ github.event.pull_request.number }} -b "🛠️ **Develop** — Claude is implementing to make the tests pass… ([run]($RUN_URL))"
       - name: Claude implements
         uses: anthropics/claude-code-action@v1
         with:
@@ -174,6 +191,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh pr ready ${{ github.event.pull_request.number }} || true
+      - name: Comment — review started
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: gh pr comment ${{ github.event.pull_request.number }} -b "📖 Tests green — PR marked **ready**. 👀 **Code review** — ChatGPT is reviewing the implementation… ([run]($RUN_URL))"
       - name: ChatGPT code review
         id: cr
         env:
@@ -187,6 +209,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh pr comment ${{ github.event.pull_request.number }} --body-file review.md
+      - name: Comment — review verdict
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ steps.cr.outputs.verdict }}" = "APPROVE" ]; then
+            gh pr comment ${{ github.event.pull_request.number }} -b "👀 **Code review** verdict: ✅ APPROVE → approving, running full CI, and squash-merging."
+          else
+            gh pr comment ${{ github.event.pull_request.number }} -b "👀 **Code review** verdict: 📝 REQUEST_CHANGES → Claude will address the comments."
+          fi
       - name: Save review for the address step
         if: steps.cr.outputs.verdict == 'REQUEST_CHANGES'
         uses: actions/upload-artifact@v4
@@ -211,6 +242,11 @@ jobs:
         id: rv
         run: |
           { echo "review<<RV_EOF"; cat review.md; echo "RV_EOF"; } >> "$GITHUB_OUTPUT"
+      - name: Comment — address started
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: gh pr comment ${{ github.event.pull_request.number }} -b "✍️ **Address review** — Claude is editing the implementation to address the review comments… ([run]($RUN_URL))"
       - name: Claude edits the code
         uses: anthropics/claude-code-action@v1
         with:
@@ -286,5 +322,6 @@ jobs:
           issue=$(gh pr view "$pr" --json body -q .body \
             | grep -oiE 'clos(e|es|ed)[[:space:]]+#[0-9]+' | grep -oE '[0-9]+' | head -1)
           if [ -n "$issue" ]; then
-            gh issue close "$issue" --reason completed -c "Implemented and merged in #$pr." || true
+            gh issue close "$issue" --reason completed -c "✅ Implemented and merged in #$pr — pipeline complete." || true
           fi
+          gh pr comment "$pr" -b "🚀 **Merged** — full CI passed, PR squash-merged${issue:+ and issue #$issue closed}. Pipeline complete."
