@@ -201,6 +201,20 @@
     var header = makeEl('h2', {className: 'column-header', textContent: name});
     col.appendChild(header);
 
+    var deleteBtn = makeEl('button', {
+      className: 'delete-list',
+      type: 'button',
+      textContent: 'Delete list'
+    });
+    deleteBtn.setAttribute('aria-label', 'Delete list');
+    deleteBtn.addEventListener('click', function() {
+      var idx = COLUMNS.indexOf(name);
+      if (idx !== -1) COLUMNS.splice(idx, 1);
+      col.remove();
+      saveBoard();
+    });
+    col.appendChild(deleteBtn);
+
     header.addEventListener('dblclick', function() {
       var currentName = header.textContent;
 
@@ -361,53 +375,52 @@
     board.appendChild(createColumnEl(name, savedCards));
   });
 
-  // Add-list form — appears after the columns inside .board-container.
+  // Add-list form
   var addListSection = makeEl('div', {className: 'add-list-section'});
 
-  var listInput = makeEl('input', {
+  var addListInput = makeEl('input', {
     className: 'list-input',
     type: 'text',
     placeholder: 'New list name'
   });
-  listInput.setAttribute('aria-label', 'New list name');
-  addListSection.appendChild(listInput);
+  addListInput.setAttribute('aria-label', 'New list name');
+  addListSection.appendChild(addListInput);
 
   var addListBtn = makeEl('button', {
-    className: 'add-list add-list-btn',
+    className: 'add-list',
     type: 'button',
     textContent: 'Add list'
   });
   addListSection.appendChild(addListBtn);
 
-  var listError = makeEl('div', {
+  var addListError = makeEl('div', {
     className: 'error',
     textContent: 'List name cannot be empty'
   });
-  listError.setAttribute('role', 'alert');
-  addListSection.appendChild(listError);
+  addListError.setAttribute('role', 'alert');
+  addListSection.appendChild(addListError);
 
-  board.appendChild(addListSection);
+  board.parentNode.insertBefore(addListSection, board.nextSibling);
 
   function addList() {
-    var name = sanitizeInput(listInput.value);
-    if (!name) {
-      listError.textContent = 'List name cannot be empty';
-      listError.classList.add('visible');
+    var listName = sanitizeInput(addListInput.value);
+    if (!listName) {
+      addListError.classList.add('visible');
       return;
     }
-    listError.classList.remove('visible');
-    COLUMNS.push(name);
-    board.insertBefore(createColumnEl(name, []), addListSection);
-    listInput.value = '';
+    addListError.classList.remove('visible');
+    COLUMNS.push(listName);
+    board.appendChild(createColumnEl(listName, []));
+    addListInput.value = '';
     saveBoard();
   }
 
   addListBtn.addEventListener('click', addList);
-  listInput.addEventListener('keydown', function(e) {
+  addListInput.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') addList();
   });
-  listInput.addEventListener('input', function() {
-    listError.classList.remove('visible');
+  addListInput.addEventListener('input', function() {
+    addListError.classList.remove('visible');
   });
 
   // Global cleanup: clear draggedCard if mouse released outside any column.
