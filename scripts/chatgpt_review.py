@@ -75,20 +75,23 @@ VERDICT: REQUEST_CHANGES
 Review the implementation against the spec and tests, as a senior reviewer. Be
 concrete and actionable — cite file and the relevant code for every point.
 
-The tests already pass (correctness vs the spec is established by the green
-suite). So judge ONLY whether anything must block merge.
+Review rigorously. The passing tests cover the spec's scenarios, but they do
+NOT prove the code is correct, secure, or maintainable in general — so look
+hard for anything that should be fixed before merge:
+- correctness bugs, missing edge cases, behavior the spec implies but the tests
+  don't pin,
+- security issues (injection/XSS, unsafe DOM, leaked secrets, unsafe defaults),
+- hard-constraint violations (static GitHub Pages app: client-side only, no
+  backend, relative asset paths),
+- genuine quality problems: confusing or dead code, poor structure,
+  duplication, unclear naming, missing error handling.
 
-REQUEST_CHANGES ONLY for blocking problems:
-- a real correctness bug or behavior the spec requires but the code misses,
-- a security flaw (injection/XSS, unsafe DOM, leaked secrets),
-- a violation of hard constraints (e.g. a static GitHub Pages app must stay
-  client-side, no backend, relative asset paths).
-
-Everything else — style, naming, DRY/refactoring ideas, "nice to haves",
-readability polish — is NON-blocking. List those as optional suggestions but
-still APPROVE. Do not request changes for preferences or to gold-plate; the
-goal is a correct, secure, mergeable change, not a perfect one. When in doubt,
-APPROVE.
+If anything should be fixed, return `VERDICT: REQUEST_CHANGES` with specific,
+actionable points — Claude will fix them. Return `VERDICT: APPROVE` only when
+the code is correct, secure, and clean with nothing left worth fixing.
+**When in doubt, REQUEST_CHANGES** — do not wave issues through. Keep each point
+concrete (cite file + code), and don't re-raise something already addressed in
+a prior round.
 
 End your response with a final line that is EXACTLY one of:
 VERDICT: APPROVE
