@@ -425,6 +425,7 @@ jobs:
           issue=$(gh pr view "$pr" --json body -q .body \
             | grep -oiE 'clos(e|es|ed)[[:space:]]+#[0-9]+' | grep -oE '[0-9]+' | head -1)
           if [ -n "$issue" ]; then
+            bash scripts/retry.sh gh issue edit "$issue" --remove-label in-development || true
             gh issue close "$issue" --reason completed -c "✅ Implemented and merged in #$pr — pipeline complete." || true
           fi
           bash scripts/retry.sh gh pr comment "$pr" -b "🚀 **Merged** — full CI passed, PR squash-merged${issue:+ and issue #$issue closed}. Pipeline complete." || true
