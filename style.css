@@ -37,3 +37,31 @@ button.add-card:hover { background: rgba(255,255,255,.4); }
   display: none;
 }
 .error.visible { display: block; }
+.add-list-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+  align-self: flex-start;
+  background: rgba(255,255,255,.15);
+  border-radius: 6px;
+  padding: 12px;
+}
+input.add-list-input {
+  border: none;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 0.875rem;
+  width: 100%;
+}
+button.add-list-btn {
+  background: rgba(255,255,255,.3);
+  border: none;
+  border-radius: 4px;
+  padding: 6px 10px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.875rem;
+  text-align: left;
+}
+button.add-list-btn:hover { background: rgba(255,255,255,.4); }

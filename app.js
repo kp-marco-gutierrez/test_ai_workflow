@@ -179,3 +179,46 @@ COLUMNS.forEach(function(name) {
   var savedCards = savedState ? (savedState[name] || []) : [];
   board.appendChild(createColumnEl(name, savedCards));
 });
+
+var addListForm = document.createElement('div');
+addListForm.className = 'add-list-form';
+
+var addListInput = document.createElement('input');
+addListInput.className = 'add-list-input';
+addListInput.type = 'text';
+addListInput.placeholder = 'New list name…';
+addListInput.setAttribute('aria-label', 'New list name');
+addListForm.appendChild(addListInput);
+
+var addListBtn = document.createElement('button');
+addListBtn.className = 'add-list-btn';
+addListBtn.type = 'button';
+addListBtn.textContent = 'Add list';
+addListBtn.setAttribute('data-action', 'add-list');
+addListForm.appendChild(addListBtn);
+
+var addListError = document.createElement('div');
+addListError.className = 'error';
+addListError.setAttribute('role', 'alert');
+addListError.textContent = 'List name cannot be empty';
+addListForm.appendChild(addListError);
+
+board.appendChild(addListForm);
+
+function addList() {
+  var name = sanitizeInput(addListInput.value);
+  if (!name) {
+    addListError.classList.add('visible');
+    return;
+  }
+  addListError.classList.remove('visible');
+  COLUMNS.push(name);
+  board.insertBefore(createColumnEl(name, []), addListForm);
+  addListInput.value = '';
+  saveBoard();
+}
+
+addListBtn.addEventListener('click', addList);
+addListInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') addList();
+});
