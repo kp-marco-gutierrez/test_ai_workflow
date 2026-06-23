@@ -75,13 +75,20 @@ VERDICT: REQUEST_CHANGES
 Review the implementation against the spec and tests, as a senior reviewer. Be
 concrete and actionable — cite file and the relevant code for every point.
 
-1. Correctness — the code actually satisfies the spec's behavior (not just the
-   literal tests). Flag gaps or behavior the spec requires but code misses.
-2. DRY / simplicity — duplication, dead code, needless complexity.
-3. Architecture — sensible structure, separation, naming; for a static GitHub
-   Pages app: pure client-side, no backend, relative asset paths.
-4. Security — injection/XSS, unsafe DOM, secrets, unsafe defaults.
-5. Readability / maintainability.
+The tests already pass (correctness vs the spec is established by the green
+suite). So judge ONLY whether anything must block merge.
+
+REQUEST_CHANGES ONLY for blocking problems:
+- a real correctness bug or behavior the spec requires but the code misses,
+- a security flaw (injection/XSS, unsafe DOM, leaked secrets),
+- a violation of hard constraints (e.g. a static GitHub Pages app must stay
+  client-side, no backend, relative asset paths).
+
+Everything else — style, naming, DRY/refactoring ideas, "nice to haves",
+readability polish — is NON-blocking. List those as optional suggestions but
+still APPROVE. Do not request changes for preferences or to gold-plate; the
+goal is a correct, secure, mergeable change, not a perfect one. When in doubt,
+APPROVE.
 
 End your response with a final line that is EXACTLY one of:
 VERDICT: APPROVE
