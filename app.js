@@ -70,6 +70,12 @@ function createCardEl(title, currentColumn) {
 
   // Mouse-based drag fallback for environments where HTML5 dragstart
   // is not reliably triggered (e.g. Playwright's CDP simulation).
+  // Use capture phase so the select's stopPropagation on mousedown
+  // cannot block this from running.
+  card.addEventListener('pointerdown', function() {
+    draggedCard = card;
+  }, { capture: true });
+
   card.addEventListener('mousedown', function() {
     draggedCard = card;
   });
