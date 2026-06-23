@@ -15,6 +15,20 @@ function sanitizeInput(value) {
   return value.trim();
 }
 
+// Creates a DOM element and sets common properties from props in one call.
+function makeEl(tag, props) {
+  var el = document.createElement(tag);
+  if (!props) return el;
+  if (props.className)       el.className = props.className;
+  if (props.textContent)     el.textContent = props.textContent;
+  if (props.type)            el.type = props.type;
+  if (props.placeholder)     el.placeholder = props.placeholder;
+  if (props.value !== undefined) el.value = props.value;
+  if (props.role)            el.setAttribute('role', props.role);
+  if (props.ariaLabel)       el.setAttribute('aria-label', props.ariaLabel);
+  return el;
+}
+
 // Returns the first .column element whose header matches name, or null.
 function findColumnEl(name) {
   var cols = document.querySelectorAll('.column');
@@ -50,24 +64,15 @@ function loadBoard() {
 
 // Builds a card element with a title label and a column-select control for moving.
 function createCardEl(title, currentColumn) {
-  var card = document.createElement('div');
-  card.className = 'card';
+  var card = makeEl('div', { className: 'card' });
+  card.appendChild(makeEl('span', { className: 'card-title', textContent: title }));
 
-  var titleSpan = document.createElement('span');
-  titleSpan.className = 'card-title';
-  titleSpan.textContent = title;
-  card.appendChild(titleSpan);
-
-  var select = document.createElement('select');
-  select.setAttribute('aria-label', ARIA_MOVE_TO_COLUMN);
+  var select = makeEl('select', { ariaLabel: ARIA_MOVE_TO_COLUMN });
   COLUMNS.forEach(function(col) {
-    var option = document.createElement('option');
-    option.value = col;
-    option.textContent = col;
+    var option = makeEl('option', { value: col, textContent: col });
     if (col === currentColumn) option.selected = true;
     select.appendChild(option);
   });
-
   select.addEventListener('change', function() {
     var targetCol = findColumnEl(select.value);
     if (targetCol) {
@@ -75,43 +80,21 @@ function createCardEl(title, currentColumn) {
       saveBoard();
     }
   });
-
   card.appendChild(select);
   return card;
 }
 
-// Builds a column element with a header, delete button, rename-on-dblclick,
-// a cards list (optionally pre-populated from savedCards), and an add-card form.
-// Deleting the column calls col.remove(), which removes all child card elements.
-function createColumnEl(name, savedCards) {
-  var col = document.createElement('div');
-  col.className = 'column';
-
-  var header = document.createElement('h2');
-  header.className = 'column-header';
-  header.textContent = name;
-  col.appendChild(header);
-
-  var deleteBtn = document.createElement('button');
-  deleteBtn.className = 'delete-list';
-  deleteBtn.setAttribute('aria-label', ARIA_DELETE_LIST);
-  deleteBtn.textContent = '×';
-  deleteBtn.addEventListener('click', function() {
-    var idx = COLUMNS.indexOf(name);
-    if (idx !== -1) COLUMNS.splice(idx, 1);
-    col.remove();
-    saveBoard();
-  });
-  col.appendChild(deleteBtn);
-
+// Attaches rename-on-dblclick behaviour to header within col.
+// getColName/setColName let the handler read and update the column name closure.
+function attachRenameHandler(header, col, getColName, setColName) {
   header.addEventListener('dblclick', function() {
-    var currentName = header.textContent;
-
-    var renameInput = document.createElement('input');
-    renameInput.className = 'list-name-input';
-    renameInput.type = 'text';
-    renameInput.value = currentName;
-    renameInput.setAttribute('aria-label', ARIA_LIST_NAME);
+    var currentName = getColName();
+    var renameInput = makeEl('input', {
+      className: 'list-name-input',
+      type: 'text',
+      value: currentName,
+      ariaLabel: ARIA_LIST_NAME,
+    });
 
     header.style.display = 'none';
     col.insertBefore(renameInput, header);
@@ -128,7 +111,7 @@ function createColumnEl(name, savedCards) {
         var idx = COLUMNS.indexOf(currentName);
         if (idx !== -1) COLUMNS[idx] = newName;
         header.textContent = newName;
-        name = newName;
+        setColName(newName);
       }
       header.style.display = '';
       renameInput.remove();
@@ -145,42 +128,23 @@ function createColumnEl(name, savedCards) {
         renameInput.remove();
       }
     });
-
     renameInput.addEventListener('blur', confirmRename);
   });
+}
 
-  var cardsList = document.createElement('div');
-  cardsList.className = 'cards-list';
-  col.appendChild(cardsList);
+// Builds the add-card form. getColName supplies the current column name at
+// card-creation time (the column may have been renamed since the form was built).
+function createAddCardForm(getColName, cardsList) {
+  var form    = makeEl('div',    { className: 'add-card-form' });
+  var input   = makeEl('input',  { className: 'card-input', type: 'text',
+                                   placeholder: 'Card title…', ariaLabel: ARIA_CARD_TITLE });
+  var button  = makeEl('button', { className: 'add-card', type: 'button',
+                                   textContent: 'Add card' });
+  var errorEl = makeEl('div',    { className: 'error', role: 'alert' });
 
-  if (savedCards) {
-    savedCards.forEach(function(title) {
-      cardsList.appendChild(createCardEl(title, name));
-    });
-  }
-
-  var form = document.createElement('div');
-  form.className = 'add-card-form';
-
-  var input = document.createElement('input');
-  input.className = 'card-input';
-  input.type = 'text';
-  input.placeholder = 'Card title…';
-  input.setAttribute('aria-label', ARIA_CARD_TITLE);
   form.appendChild(input);
-
-  var button = document.createElement('button');
-  button.className = 'add-card';
-  button.type = 'button';
-  button.textContent = 'Add card';
   form.appendChild(button);
-
-  var errorEl = document.createElement('div');
-  errorEl.className = 'error';
-  errorEl.setAttribute('role', 'alert');
   form.appendChild(errorEl);
-
-  col.appendChild(form);
 
   function addCard() {
     var title = sanitizeInput(input.value);
@@ -191,8 +155,7 @@ function createColumnEl(name, savedCards) {
     }
     errorEl.textContent = '';
     errorEl.classList.remove('visible');
-    var card = createCardEl(title, name);
-    cardsList.appendChild(card);
+    cardsList.appendChild(createCardEl(title, getColName()));
     input.value = '';
     saveBoard();
   }
@@ -201,6 +164,44 @@ function createColumnEl(name, savedCards) {
   input.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') addCard();
   });
+
+  return form;
+}
+
+// Builds a column element with a header, delete button, rename-on-dblclick,
+// a cards list (optionally pre-populated from savedCards), and an add-card form.
+// Deleting the column calls col.remove(), which removes all child card elements.
+function createColumnEl(name, savedCards) {
+  var col = makeEl('div', { className: 'column' });
+
+  var header = makeEl('h2', { className: 'column-header', textContent: name });
+  col.appendChild(header);
+
+  var deleteBtn = makeEl('button', { className: 'delete-list',
+                                     ariaLabel: ARIA_DELETE_LIST, textContent: '×' });
+  deleteBtn.addEventListener('click', function() {
+    var idx = COLUMNS.indexOf(name);
+    if (idx !== -1) COLUMNS.splice(idx, 1);
+    col.remove();
+    saveBoard();
+  });
+  col.appendChild(deleteBtn);
+
+  attachRenameHandler(header, col,
+    function()        { return name; },
+    function(newName) { name = newName; }
+  );
+
+  var cardsList = makeEl('div', { className: 'cards-list' });
+  col.appendChild(cardsList);
+
+  if (savedCards) {
+    savedCards.forEach(function(title) {
+      cardsList.appendChild(createCardEl(title, name));
+    });
+  }
+
+  col.appendChild(createAddCardForm(function() { return name; }, cardsList));
 
   return col;
 }
