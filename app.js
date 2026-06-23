@@ -1,10 +1,28 @@
-var COLUMNS = ['To Do', 'Doing', 'Done'];
 var STORAGE_KEY = 'trello-lite-board';
+
+var ARIA_MOVE_TO_COLUMN = 'Move to column';
+var ARIA_DELETE_LIST    = 'Delete list';
+var ARIA_LIST_NAME      = 'List name';
+var ARIA_CARD_TITLE     = 'Card title';
+var MSG_EMPTY_CARD      = 'Card title cannot be empty';
+
+// Centralised mutable list of column names (order determines render order).
+var COLUMNS = ['To Do', 'Doing', 'Done'];
 
 // Returns trimmed input. XSS safety is enforced at the DOM layer by always
 // assigning user content via textContent, never innerHTML.
 function sanitizeInput(value) {
   return value.trim();
+}
+
+// Returns the first .column element whose header matches name, or null.
+function findColumnEl(name) {
+  var cols = document.querySelectorAll('.column');
+  for (var i = 0; i < cols.length; i++) {
+    var h = cols[i].querySelector('.column-header');
+    if (h && h.textContent === name) return cols[i];
+  }
+  return null;
 }
 
 function saveBoard() {
@@ -41,7 +59,7 @@ function createCardEl(title, currentColumn) {
   card.appendChild(titleSpan);
 
   var select = document.createElement('select');
-  select.setAttribute('aria-label', 'Move to column');
+  select.setAttribute('aria-label', ARIA_MOVE_TO_COLUMN);
   COLUMNS.forEach(function(col) {
     var option = document.createElement('option');
     option.value = col;
@@ -51,15 +69,10 @@ function createCardEl(title, currentColumn) {
   });
 
   select.addEventListener('change', function() {
-    var targetName = select.value;
-    var columns = document.querySelectorAll('.column');
-    for (var i = 0; i < columns.length; i++) {
-      var header = columns[i].querySelector('.column-header');
-      if (header && header.textContent === targetName) {
-        columns[i].querySelector('.cards-list').appendChild(card);
-        saveBoard();
-        break;
-      }
+    var targetCol = findColumnEl(select.value);
+    if (targetCol) {
+      targetCol.querySelector('.cards-list').appendChild(card);
+      saveBoard();
     }
   });
 
@@ -81,7 +94,7 @@ function createColumnEl(name, savedCards) {
 
   var deleteBtn = document.createElement('button');
   deleteBtn.className = 'delete-list';
-  deleteBtn.setAttribute('aria-label', 'Delete list');
+  deleteBtn.setAttribute('aria-label', ARIA_DELETE_LIST);
   deleteBtn.textContent = '×';
   deleteBtn.addEventListener('click', function() {
     var idx = COLUMNS.indexOf(name);
@@ -98,7 +111,7 @@ function createColumnEl(name, savedCards) {
     renameInput.className = 'list-name-input';
     renameInput.type = 'text';
     renameInput.value = currentName;
-    renameInput.setAttribute('aria-label', 'List name');
+    renameInput.setAttribute('aria-label', ARIA_LIST_NAME);
 
     header.style.display = 'none';
     col.insertBefore(renameInput, header);
@@ -153,7 +166,7 @@ function createColumnEl(name, savedCards) {
   input.className = 'card-input';
   input.type = 'text';
   input.placeholder = 'Card title…';
-  input.setAttribute('aria-label', 'Card title');
+  input.setAttribute('aria-label', ARIA_CARD_TITLE);
   form.appendChild(input);
 
   var button = document.createElement('button');
@@ -165,7 +178,7 @@ function createColumnEl(name, savedCards) {
   var errorEl = document.createElement('div');
   errorEl.className = 'error';
   errorEl.setAttribute('role', 'alert');
-  errorEl.textContent = 'Card title cannot be empty';
+  errorEl.textContent = MSG_EMPTY_CARD;
   form.appendChild(errorEl);
 
   col.appendChild(form);
