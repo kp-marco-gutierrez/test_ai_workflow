@@ -357,6 +357,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REVIEW_ROUNDS_CAP: "5"
         run: |
+          # Give the reviewer memory of prior rounds so it doesn't re-raise
+          # already-resolved points (the main cause of non-convergence).
+          gh pr view ${{ github.event.pull_request.number }} --json comments \
+            -q '[.comments[] | select(.body | contains("Code review (ChatGPT)")) | .body] | join("\n\n---\n\n")' \
+            > prior-reviews.md 2>/dev/null || true
           verdict="$(python3 scripts/chatgpt_review.py --mode code)"
           # Anti-runaway guard: keep fixing issues round after round, but if the
           # review still hasn't converged after many rounds, ESCALATE TO A HUMAN.
