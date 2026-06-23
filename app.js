@@ -9,9 +9,18 @@
     cardEmpty: 'Card title cannot be empty',
     listEmpty: 'List name cannot be empty',
     listDuplicate: 'A list with that name already exists',
-    saveFailed: 'Could not save board — storage unavailable',
-    saveFailedQuota: 'Could not save board — storage quota exceeded',
+    saveFailed: 'Could not save board — storage unavailable (try allowing storage in your browser settings)',
+    saveFailedQuota: 'Could not save board — storage full; free up browser storage to continue saving',
     loadFailed: 'Could not restore saved board — storage unavailable',
+  };
+
+  // CSS class selectors referenced in multiple places, centralised here to
+  // avoid scattered magic strings and simplify future renames.
+  var SEL = {
+    COLUMN: '.column',
+    COLUMN_HEADER: '.column-header',
+    CARDS_LIST: '.cards-list',
+    BOARD: '.board-container',
   };
 
   // Belt-and-suspenders: strip HTML-meaningful characters so stored/displayed
@@ -25,7 +34,7 @@
 
   // Creates an element, sets own properties, and optionally sets HTML
   // attributes (e.g. aria-* or role) via setAttribute to avoid repetition.
-  function makeEl(tag, props, attrs) {
+  function createElement(tag, props, attrs) {
     var el = document.createElement(tag);
     for (var k in props) el[k] = props[k];
     if (attrs) {
@@ -35,21 +44,32 @@
   }
 
   function makeErrorEl(message) {
-    return makeEl('div', { className: 'error', textContent: message }, { role: 'alert' });
+    return createElement('div', { className: 'error', textContent: message }, { role: 'alert' });
+  }
+
+  // Helpers to show/hide inline error elements consistently across both
+  // card and list forms, avoiding duplicated classList/textContent calls.
+  function showError(errorEl, msg) {
+    errorEl.textContent = msg;
+    errorEl.classList.add('visible');
+  }
+
+  function clearError(errorEl) {
+    errorEl.classList.remove('visible');
   }
 
   // Returns live h2.column-header elements — used for case-insensitive
   // duplicate checks so COLUMNS and the DOM never drift apart.
   function columnHeaders() {
-    return Array.from(document.querySelectorAll('.column-header'));
+    return Array.from(document.querySelectorAll(SEL.COLUMN_HEADER));
   }
 
   var _storageNotice = null;
 
   function showStorageError(msg) {
     if (!_storageNotice) {
-      _storageNotice = makeEl('div', { className: 'storage-notice', textContent: msg }, { role: 'alert' });
-      var boardContainer = document.querySelector('.board-container');
+      _storageNotice = createElement('div', { className: 'storage-notice', textContent: msg }, { role: 'alert' });
+      var boardContainer = document.querySelector(SEL.BOARD);
       document.body.insertBefore(_storageNotice, boardContainer);
     } else {
       _storageNotice.textContent = msg;
@@ -61,8 +81,8 @@
   // renamed columns are always captured correctly.
   function saveBoard() {
     var state = {};
-    document.querySelectorAll('.column').forEach(function (col) {
-      var header = col.querySelector('.column-header');
+    document.querySelectorAll(SEL.COLUMN).forEach(function (col) {
+      var header = col.querySelector(SEL.COLUMN_HEADER);
       if (!header) return;
       var colName = header.textContent;
       state[colName] = [];
@@ -108,7 +128,7 @@
   }
 
   function createCardEl(title, currentColumn) {
-    var card = makeEl('div', { className: 'card', draggable: true });
+    var card = createElement('div', { className: 'card', draggable: true });
 
     card.addEventListener('dragstart', function (e) {
       draggedCard = card;
@@ -126,12 +146,12 @@
       draggedCard = card;
     });
 
-    var titleSpan = makeEl('span', { className: 'card-title', textContent: title });
+    var titleSpan = createElement('span', { className: 'card-title', textContent: title });
     card.appendChild(titleSpan);
 
-    var select = makeEl('select', {}, { 'aria-label': 'Move to column' });
+    var select = createElement('select', {}, { 'aria-label': 'Move to column' });
     COLUMNS.forEach(function (col) {
-      var option = makeEl('option', { value: col, textContent: col });
+      var option = createElement('option', { value: col, textContent: col });
       if (col === currentColumn) option.selected = true;
       select.appendChild(option);
     });
@@ -143,10 +163,10 @@
 
     select.addEventListener('change', function () {
       var targetName = select.value;
-      document.querySelectorAll('.column').forEach(function (col) {
-        var header = col.querySelector('.column-header');
+      document.querySelectorAll(SEL.COLUMN).forEach(function (col) {
+        var header = col.querySelector(SEL.COLUMN_HEADER);
         if (header && header.textContent === targetName) {
-          col.querySelector('.cards-list').appendChild(card);
+          col.querySelector(SEL.CARDS_LIST).appendChild(card);
           saveBoard();
         }
       });
@@ -157,62 +177,80 @@
   }
 
   function createColumnEl(name, savedCards) {
-    var col = makeEl('div', { className: 'column' });
+    var col = createElement('div', { className: 'column' });
 
-    var header = makeEl('h2', { className: 'column-header', textContent: name });
+    var header = createElement('h2', { className: 'column-header', textContent: name });
     col.appendChild(header);
 
     header.addEventListener('dblclick', function () {
       var currentName = header.textContent;
 
-      var renameInput = makeEl('input', {
+      var renameInput = createElement('input', {
         className: 'list-name-input',
         type: 'text',
         value: currentName,
       }, { 'aria-label': 'List name' });
 
+      var renameErrorEl = makeErrorEl('');
+
       header.style.display = 'none';
       col.insertBefore(renameInput, header);
+      col.insertBefore(renameErrorEl, header);
       renameInput.focus();
       renameInput.select();
 
       var renameCompleted = false;
 
-      function confirmRename() {
+      function closeRename() {
         if (renameCompleted) return;
         renameCompleted = true;
+        header.style.display = '';
+        renameInput.remove();
+        renameErrorEl.remove();
+      }
+
+      function doRename() {
         var newName = sanitizeInput(renameInput.value);
         var newLower = newName.toLowerCase();
         var currentLower = currentName.toLowerCase();
-        // Case-insensitive duplicate check against live DOM headers.
-        var isDuplicate = newLower !== currentLower &&
-          columnHeaders().some(function (h) {
-            return h.textContent.toLowerCase() === newLower;
-          });
-        if (newName && !isDuplicate && newLower !== currentLower) {
-          var idx = COLUMNS.indexOf(currentName);
-          if (idx !== -1) COLUMNS[idx] = newName;
-          header.textContent = newName;
-          name = newName;
-          saveBoard();
+
+        if (newLower === currentLower) {
+          closeRename();
+          return;
         }
-        header.style.display = '';
-        renameInput.remove();
+
+        if (!newName) {
+          showError(renameErrorEl, MESSAGES.listEmpty);
+          return;
+        }
+
+        // Case-insensitive duplicate check against live DOM headers.
+        var isDuplicate = columnHeaders().some(function (h) {
+          return h.textContent.toLowerCase() === newLower;
+        });
+        if (isDuplicate) {
+          showError(renameErrorEl, MESSAGES.listDuplicate);
+          return;
+        }
+
+        var idx = COLUMNS.indexOf(currentName);
+        if (idx !== -1) COLUMNS[idx] = newName;
+        header.textContent = newName;
+        name = newName;
+        saveBoard();
+        closeRename();
       }
 
       renameInput.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') {
           e.preventDefault();
-          confirmRename();
+          doRename();
         } else if (e.key === 'Escape') {
-          if (renameCompleted) return;
-          renameCompleted = true;
-          header.style.display = '';
-          renameInput.remove();
+          closeRename();
         }
       });
 
-      renameInput.addEventListener('blur', confirmRename);
+      renameInput.addEventListener('blur', closeRename);
     });
 
     col.addEventListener('dragover', function (e) {
@@ -228,14 +266,14 @@
     // Mouse-based drop: handles drag_to() when HTML5 dragstart doesn't fire.
     col.addEventListener('mouseup', function () {
       if (!draggedCard) return;
-      var sourceCol = draggedCard.closest('.column');
+      var sourceCol = draggedCard.closest(SEL.COLUMN);
       if (sourceCol !== col) {
         handleCardDrop(cardsList, name);
       }
       draggedCard = null;
     });
 
-    var cardsList = makeEl('div', { className: 'cards-list' });
+    var cardsList = createElement('div', { className: 'cards-list' });
     col.appendChild(cardsList);
 
     if (savedCards) {
@@ -244,16 +282,16 @@
       });
     }
 
-    var form = makeEl('div', { className: 'add-card-form' });
+    var form = createElement('div', { className: 'add-card-form' });
 
-    var input = makeEl('input', {
+    var input = createElement('input', {
       className: 'card-input',
       type: 'text',
       placeholder: 'Card title…',
     }, { 'aria-label': 'Card title' });
     form.appendChild(input);
 
-    var button = makeEl('button', {
+    var button = createElement('button', {
       className: 'add-card',
       type: 'button',
       textContent: 'Add card',
@@ -268,10 +306,10 @@
     function addCard() {
       var title = sanitizeInput(input.value);
       if (!title) {
-        errorEl.classList.add('visible');
+        showError(errorEl, MESSAGES.cardEmpty);
         return;
       }
-      errorEl.classList.remove('visible');
+      clearError(errorEl);
       cardsList.appendChild(createCardEl(title, name));
       input.value = '';
       saveBoard();
@@ -286,16 +324,16 @@
   }
 
   function createAddListForm() {
-    var form = makeEl('div', { className: 'add-list-form' });
+    var form = createElement('div', { className: 'add-list-form' });
 
-    var input = makeEl('input', {
+    var input = createElement('input', {
       className: 'add-list-input',
       type: 'text',
       placeholder: 'New list name…',
     }, { 'aria-label': 'New list name' });
     form.appendChild(input);
 
-    var button = makeEl('button', {
+    var button = createElement('button', {
       className: 'add-list-btn',
       type: 'button',
       textContent: 'Add list',
@@ -308,8 +346,7 @@
     function addList() {
       var name = sanitizeInput(input.value);
       if (!name) {
-        errorEl.textContent = MESSAGES.listEmpty;
-        errorEl.classList.add('visible');
+        showError(errorEl, MESSAGES.listEmpty);
         return;
       }
       // Case-insensitive duplicate check against live DOM headers.
@@ -317,11 +354,10 @@
         return h.textContent.toLowerCase() === name.toLowerCase();
       });
       if (duplicate) {
-        errorEl.textContent = MESSAGES.listDuplicate;
-        errorEl.classList.add('visible');
+        showError(errorEl, MESSAGES.listDuplicate);
         return;
       }
-      errorEl.classList.remove('visible');
+      clearError(errorEl);
       COLUMNS.push(name);
       board.insertBefore(createColumnEl(name, []), form);
       input.value = '';
@@ -338,7 +374,7 @@
 
   // Columns are appended by iterating COLUMNS in order, which enforces the
   // "To Do", "Doing", "Done" display order required by the board layout spec.
-  var board = document.querySelector('.board-container');
+  var board = document.querySelector(SEL.BOARD);
   var savedState = loadBoard();
   COLUMNS.forEach(function (name) {
     var savedCards = savedState ? (savedState[name] || []) : [];
