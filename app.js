@@ -1,50 +1,61 @@
-var COLUMNS = ['To Do', 'Doing', 'Done'];
-var draggedCard = null;      // HTML5 drag API
-var draggedCardMouse = null; // mouse-event drag (Playwright drag_to compatibility)
+const COLUMNS = ['To Do', 'Doing', 'Done'];
 
-// Release mouse drag on any mouseup that bubbles to document
+// Encapsulate drag state for both HTML5 drag API and mouse-based drag (Playwright)
+const dragState = {
+  html5Card: null,
+  mouseCard: null,
+};
+
+// Shared helper used by all drag paths to move a card into a column
+function moveCardToColumn(card, columnEl) {
+  columnEl.querySelector('.cards-list').appendChild(card);
+}
+
+// Release mouse-based drag on any mouseup that bubbles to document
 document.addEventListener('mouseup', function(e) {
-  if (draggedCardMouse) {
-    var targetColumn = e.target.closest('.column');
-    if (targetColumn && !targetColumn.contains(draggedCardMouse)) {
-      targetColumn.querySelector('.cards-list').appendChild(draggedCardMouse);
+  if (dragState.mouseCard) {
+    const targetColumn = e.target.closest('.column');
+    if (targetColumn && !targetColumn.contains(dragState.mouseCard)) {
+      moveCardToColumn(dragState.mouseCard, targetColumn);
     }
-    draggedCardMouse = null;
+    dragState.mouseCard = null;
   }
 });
 
+// textContent is used throughout to render user values, preventing XSS
 function sanitizeInput(value) {
   return value.trim();
 }
 
-function createCardEl(title, currentColumn) {
-  var card = document.createElement('div');
+function createCardElement(title, currentColumn) {
+  const card = document.createElement('div');
   card.className = 'card';
   card.draggable = true;
 
+  // HTML5 drag API: standard pointer/keyboard drag
   card.addEventListener('dragstart', function(e) {
-    draggedCard = card;
+    dragState.html5Card = card;
     e.dataTransfer.effectAllowed = 'move';
   });
 
   card.addEventListener('dragend', function() {
-    draggedCard = null;
+    dragState.html5Card = null;
   });
 
-  // Track mouse-based drag start (for Playwright drag_to)
+  // Mouse-event fallback required for programmatic drag tools (e.g. Playwright drag_to)
   card.addEventListener('mousedown', function() {
-    draggedCardMouse = card;
+    dragState.mouseCard = card;
   });
 
-  var titleSpan = document.createElement('span');
+  const titleSpan = document.createElement('span');
   titleSpan.className = 'card-title';
   titleSpan.textContent = title;
   card.appendChild(titleSpan);
 
-  var select = document.createElement('select');
+  const select = document.createElement('select');
   select.setAttribute('aria-label', 'Move to column');
   COLUMNS.forEach(function(col) {
-    var option = document.createElement('option');
+    const option = document.createElement('option');
     option.value = col;
     option.textContent = col;
     if (col === currentColumn) option.selected = true;
@@ -52,12 +63,12 @@ function createCardEl(title, currentColumn) {
   });
 
   select.addEventListener('change', function() {
-    var targetName = select.value;
-    var columns = document.querySelectorAll('.column');
-    for (var i = 0; i < columns.length; i++) {
-      var header = columns[i].querySelector('.column-header');
+    const targetName = select.value;
+    const columns = document.querySelectorAll('.column');
+    for (let i = 0; i < columns.length; i++) {
+      const header = columns[i].querySelector('.column-header');
       if (header && header.textContent === targetName) {
-        columns[i].querySelector('.cards-list').appendChild(card);
+        moveCardToColumn(card, columns[i]);
         break;
       }
     }
@@ -68,35 +79,35 @@ function createCardEl(title, currentColumn) {
 }
 
 function createColumnEl(name) {
-  var col = document.createElement('div');
+  const col = document.createElement('div');
   col.className = 'column';
 
-  var header = document.createElement('h2');
+  const header = document.createElement('h2');
   header.className = 'column-header';
   header.textContent = name;
   col.appendChild(header);
 
-  var cardsList = document.createElement('div');
+  const cardsList = document.createElement('div');
   cardsList.className = 'cards-list';
   col.appendChild(cardsList);
 
-  var form = document.createElement('div');
+  const form = document.createElement('div');
   form.className = 'add-card-form';
 
-  var input = document.createElement('input');
+  const input = document.createElement('input');
   input.className = 'card-input';
   input.type = 'text';
   input.placeholder = 'Card title…';
   input.setAttribute('aria-label', 'Card title');
   form.appendChild(input);
 
-  var button = document.createElement('button');
+  const button = document.createElement('button');
   button.className = 'add-card';
   button.type = 'button';
   button.textContent = 'Add card';
   form.appendChild(button);
 
-  var errorEl = document.createElement('div');
+  const errorEl = document.createElement('div');
   errorEl.className = 'error';
   errorEl.setAttribute('role', 'alert');
   errorEl.textContent = 'Card title cannot be empty';
@@ -111,32 +122,31 @@ function createColumnEl(name) {
 
   col.addEventListener('drop', function(e) {
     e.preventDefault();
-    if (draggedCard) {
-      cardsList.appendChild(draggedCard);
+    if (dragState.html5Card) {
+      moveCardToColumn(dragState.html5Card, col);
     }
   });
 
-  function addCard() {
-    var title = sanitizeInput(input.value);
+  function handleAddCard() {
+    const title = sanitizeInput(input.value);
     if (!title) {
       errorEl.classList.add('visible');
       return;
     }
     errorEl.classList.remove('visible');
-    var card = createCardEl(title, name);
-    cardsList.appendChild(card);
+    cardsList.appendChild(createCardElement(title, name));
     input.value = '';
   }
 
-  button.addEventListener('click', addCard);
+  button.addEventListener('click', handleAddCard);
   input.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') addCard();
+    if (e.key === 'Enter') handleAddCard();
   });
 
   return col;
 }
 
-var board = document.querySelector('.board-container');
+const board = document.querySelector('.board-container');
 COLUMNS.forEach(function(name) {
   board.appendChild(createColumnEl(name));
 });
