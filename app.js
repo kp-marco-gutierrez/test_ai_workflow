@@ -5,6 +5,41 @@ function sanitizeInput(value) {
   return value.trim();
 }
 
+function createCardEl(title, currentColumn) {
+  var card = document.createElement('div');
+  card.className = 'card';
+
+  var titleSpan = document.createElement('span');
+  titleSpan.className = 'card-title';
+  titleSpan.textContent = title;
+  card.appendChild(titleSpan);
+
+  var select = document.createElement('select');
+  select.setAttribute('aria-label', 'Move to column');
+  COLUMNS.forEach(function(col) {
+    var option = document.createElement('option');
+    option.value = col;
+    option.textContent = col;
+    if (col === currentColumn) option.selected = true;
+    select.appendChild(option);
+  });
+
+  select.addEventListener('change', function() {
+    var targetName = select.value;
+    var columns = document.querySelectorAll('.column');
+    for (var i = 0; i < columns.length; i++) {
+      var header = columns[i].querySelector('.column-header');
+      if (header && header.textContent === targetName) {
+        columns[i].querySelector('.cards-list').appendChild(card);
+        break;
+      }
+    }
+  });
+
+  card.appendChild(select);
+  return card;
+}
+
 function createColumnEl(name) {
   var col = document.createElement('div');
   col.className = 'column';
@@ -49,9 +84,7 @@ function createColumnEl(name) {
       return;
     }
     errorEl.classList.remove('visible');
-    var card = document.createElement('div');
-    card.className = 'card';
-    card.textContent = title;
+    var card = createCardEl(title, name);
     cardsList.appendChild(card);
     input.value = '';
   }
