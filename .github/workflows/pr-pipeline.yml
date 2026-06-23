@@ -33,8 +33,41 @@ env:
   MAX_AI_COMMITS: "30" # loop safety cap (commits on the PR branch beyond main)
 
 jobs:
+  sync:
+    name: Sync with main (auto-resolve conflicts before merge)
+    if: contains(github.event.pull_request.labels.*.name, 'ai-tests')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Merge main into the PR branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo "Branch already contains main — nothing to sync."
+            exit 0
+          fi
+          echo "Branch is behind main — merging (conflicts resolved toward main)."
+          # Resolve content conflicts toward main; the PR's own changes are then
+          # re-applied by the develop loop (driven by this PR's tests) and the
+          # verify gate proves they pass on the latest main before merge.
+          if ! git merge --no-edit -X theirs origin/main; then
+            echo "::error::Merge could not be auto-resolved (non-content conflict)."
+            git merge --abort || true
+            exit 1
+          fi
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
+          bash scripts/retry.sh gh pr comment ${{ github.event.pull_request.number }} -b "🔀 **Synced with \`main\`** and auto-resolved conflicts (favoring main). The pipeline re-applies this PR's changes (driven by its tests) and re-verifies before merge." || true
+
   tests:
     name: Run tests (deterministic)
+    needs: sync
     if: contains(github.event.pull_request.labels.*.name, 'ai-tests')
     runs-on: ubuntu-latest
     outputs:
@@ -425,6 +458,7 @@ jobs:
           issue=$(gh pr view "$pr" --json body -q .body \
             | grep -oiE 'clos(e|es|ed)[[:space:]]+#[0-9]+' | grep -oE '[0-9]+' | head -1)
           if [ -n "$issue" ]; then
+            bash scripts/retry.sh gh issue edit "$issue" --remove-label in-development || true
             gh issue close "$issue" --reason completed -c "✅ Implemented and merged in #$pr — pipeline complete." || true
           fi
           bash scripts/retry.sh gh pr comment "$pr" -b "🚀 **Merged** — full CI passed, PR squash-merged${issue:+ and issue #$issue closed}. Pipeline complete." || true
