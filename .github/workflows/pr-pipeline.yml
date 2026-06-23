@@ -279,3 +279,11 @@ jobs:
           gh api -X DELETE \
             "repos/${{ github.repository }}/git/refs/heads/${{ github.event.pull_request.head.ref }}" \
             || echo "branch already deleted"
+          # Deterministically close the linked issue. Keyword auto-close
+          # ("Closes #N" in the PR body) is unreliable for bot-authored PRs
+          # squash-merged via the API, so close it explicitly.
+          issue=$(gh pr view "$pr" --json body -q .body \
+            | grep -oiE 'clos(e|es|ed)[[:space:]]+#[0-9]+' | grep -oE '[0-9]+' | head -1)
+          if [ -n "$issue" ]; then
+            gh issue close "$issue" --reason completed -c "Implemented and merged in #$pr." || true
+          fi
