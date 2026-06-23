@@ -63,7 +63,9 @@ function createCardEl(title, currentColumn) {
   });
 
   card.addEventListener('dragend', function() {
-    draggedCard = null;
+    // Do NOT clear draggedCard here — if drop didn't fire (e.g. Playwright
+    // CDP drag that never established a valid drop zone), the mouseup fallback
+    // on the target column still needs draggedCard to complete the move.
   });
 
   // Mouse-based drag fallback for environments where HTML5 dragstart
@@ -170,6 +172,10 @@ function createColumnEl(name, savedCards) {
     });
 
     renameInput.addEventListener('blur', confirmRename);
+  });
+
+  col.addEventListener('dragenter', function(e) {
+    e.preventDefault();
   });
 
   col.addEventListener('dragover', function(e) {
