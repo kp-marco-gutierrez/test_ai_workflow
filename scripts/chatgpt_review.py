@@ -75,21 +75,23 @@ VERDICT: REQUEST_CHANGES
 Review the implementation against the spec and tests, as a senior reviewer. Be
 concrete and actionable — cite file and the relevant code for every point.
 
-The tests already pass, so correctness vs the spec is ESTABLISHED. Your job is
-NOT to make the code perfect — it is to catch anything that must block merge.
+Review rigorously. The passing tests cover the spec's scenarios, but they do
+NOT prove the code is correct, secure, or maintainable in general — so look
+hard for anything that should be fixed before merge:
+- correctness bugs, missing edge cases, behavior the spec implies but the tests
+  don't pin,
+- security issues (injection/XSS, unsafe DOM, leaked secrets, unsafe defaults),
+- hard-constraint violations (static GitHub Pages app: client-side only, no
+  backend, relative asset paths),
+- genuine quality problems: confusing or dead code, poor structure,
+  duplication, unclear naming, missing error handling.
 
-Return `VERDICT: REQUEST_CHANGES` ONLY if you can point to a CONCRETE, DEMONSTRABLE
-blocking defect:
-- a bug that would make a spec scenario fail or produce wrong behavior,
-- a security vulnerability (injection/XSS, unsafe DOM, leaked secrets),
-- a violation of a hard constraint (static GitHub Pages app: client-side only,
-  no backend, relative asset paths).
-
-If your findings are about documentation, comments, naming, consistency,
-structure, DRY/refactoring, "nice to haves", or any preference/polish — those
-are NEVER grounds to block. List them as optional suggestions and return
-`VERDICT: APPROVE` anyway. If you have NO concrete blocking defect from the list
-above, you MUST return `VERDICT: APPROVE`. When in doubt, APPROVE.
+If anything should be fixed, return `VERDICT: REQUEST_CHANGES` with specific,
+actionable points — Claude will fix them. Return `VERDICT: APPROVE` only when
+the code is correct, secure, and clean with nothing left worth fixing.
+**When in doubt, REQUEST_CHANGES** — do not wave issues through. Keep each point
+concrete (cite file + code), and don't re-raise something already addressed in
+a prior round.
 
 End your response with a final line that is EXACTLY one of:
 VERDICT: APPROVE
