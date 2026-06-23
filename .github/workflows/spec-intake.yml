@@ -2,7 +2,7 @@ name: Spec Intake (Issue -> Tests)
 
 # Issue-driven entry to the AI-only pipeline.
 # A BDD spec is filed as a GitHub Issue (see .github/ISSUE_TEMPLATE/bdd-spec.md).
-# Generation is triggered by a human commenting `@generate-tests` on the issue —
+# Generation is triggered by a human commenting `@go-develop` on the issue —
 # the spec is authored first, reviewed, then explicitly kicked off.
 #
 # This workflow runs the spec guardrail (BDD format + task size). If it passes,
@@ -28,7 +28,7 @@ jobs:
     # Only on issue comments (not PR comments) that contain the trigger phrase.
     if: |
       github.event.issue.pull_request == null &&
-      contains(github.event.comment.body, '@generate-tests')
+      contains(github.event.comment.body, '@go-develop')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +39,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: bash scripts/retry.sh gh issue comment ${{ github.event.issue.number }} -b "🚦 \`@generate-tests\` received — **Spec intake (AI1)** validating the spec and generating tests… ([run]($RUN_URL))" || true
+        run: bash scripts/retry.sh gh issue comment ${{ github.event.issue.number }} -b "🚦 \`@go-develop\` received — **Spec intake (AI1)** validating the spec and generating tests… ([run]($RUN_URL))" || true
 
       - name: Spec intake (AI1)
         uses: anthropics/claude-code-action@v1
@@ -50,7 +50,7 @@ jobs:
           prompt: |
             You are the spec-intake agent (AI1) in an automated BDD pipeline.
 
-            A human commented `@generate-tests` on issue
+            A human commented `@go-develop` on issue
             #${{ github.event.issue.number }} to request test generation. The
             issue BODY contains a BDD spec inside a ```gherkin code block. Do the
             following, in order:
