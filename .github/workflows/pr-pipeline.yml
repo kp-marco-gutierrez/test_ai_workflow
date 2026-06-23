@@ -127,6 +127,9 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # The pipeline is bot-driven (AI creates/labels/pushes), so the
+          # triggering actor is a bot — allow it.
+          allowed_bots: "*"
           claude_args: '--allowed-tools "Read,Write,Edit,Glob,Grep,Bash"'
           prompt: |
             You are AI2 (the implementer) on PR #${{ github.event.pull_request.number }}.
@@ -211,6 +214,9 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # The pipeline is bot-driven (AI creates/labels/pushes), so the
+          # triggering actor is a bot — allow it.
+          allowed_bots: "*"
           claude_args: '--allowed-tools "Read,Write,Edit,Glob,Grep,Bash"'
           prompt: |
             You are AI2 on PR #${{ github.event.pull_request.number }}. ChatGPT
