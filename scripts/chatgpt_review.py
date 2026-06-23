@@ -75,12 +75,20 @@ VERDICT: REQUEST_CHANGES
 Review the implementation against the spec and tests, as a senior reviewer. Be
 concrete and actionable — cite file and the relevant code for every point.
 
+SPEC COMPLIANCE IS ALREADY PROVEN by the passing test suite. You MUST NOT claim
+the code "does not meet the spec", and MUST NOT flag any spec scenario as
+unmet/broken — the tests for those pass. Do NOT invent requirements that aren't
+literally in the .feature files (e.g. an error message on blank rename when the
+spec only requires the rename to be rejected).
+
 Decide ONE thing: does anything BLOCK merge? Block (REQUEST_CHANGES) ONLY for:
-- a correctness bug, or behavior that violates the spec,
 - a security vulnerability,
 - a hard-constraint violation (static GitHub Pages app: client-side only, no
   backend, relative asset paths),
-- a clear defect that would bite users.
+- a concrete correctness bug in behavior NOT covered by the tests, that you can
+  demonstrate with a specific input → wrong output.
+
+If you cannot point to one of those, APPROVE.
 
 Everything else is NON-BLOCKING — list it as an optional suggestion but still
 APPROVE: style, naming, duplication/DRY, structure ("consider encapsulating X",
