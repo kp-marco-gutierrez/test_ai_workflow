@@ -37,11 +37,17 @@ function createCardEl(title, currentColumn) {
   card.addEventListener('dragstart', function(e) {
     draggedCard = card;
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', '');
+    e.dataTransfer.setData('text/plain', title);
   });
 
   card.addEventListener('dragend', function() {
     draggedCard = null;
+  });
+
+  // Mouse-based drag fallback for environments where HTML5 dragstart
+  // is not reliably triggered (e.g. Playwright's CDP simulation).
+  card.addEventListener('mousedown', function() {
+    draggedCard = card;
   });
 
   var titleSpan = document.createElement('span');
@@ -57,6 +63,12 @@ function createCardEl(title, currentColumn) {
     option.textContent = col;
     if (col === currentColumn) option.selected = true;
     select.appendChild(option);
+  });
+
+  // Prevent the select's mousedown from setting draggedCard (the card's
+  // mousedown listener fires on bubble; stopPropagation blocks that).
+  select.addEventListener('mousedown', function(e) {
+    e.stopPropagation();
   });
 
   select.addEventListener('change', function() {
@@ -141,8 +153,22 @@ function createColumnEl(name, savedCards) {
       cardsList.appendChild(draggedCard);
       var sel = draggedCard.querySelector('select');
       if (sel) sel.value = name;
+      draggedCard = null;
       saveBoard();
     }
+  });
+
+  // Mouse-based drop: handles drag_to() when HTML5 dragstart doesn't fire.
+  col.addEventListener('mouseup', function() {
+    if (!draggedCard) return;
+    var sourceCol = draggedCard.closest('.column');
+    if (sourceCol !== col) {
+      cardsList.appendChild(draggedCard);
+      var sel = draggedCard.querySelector('select');
+      if (sel) sel.value = name;
+      saveBoard();
+    }
+    draggedCard = null;
   });
 
   var cardsList = document.createElement('div');
@@ -205,4 +231,9 @@ var savedState = loadBoard();
 COLUMNS.forEach(function(name) {
   var savedCards = savedState ? (savedState[name] || []) : [];
   board.appendChild(createColumnEl(name, savedCards));
+});
+
+// Global cleanup: clear draggedCard if mouse released outside any column.
+document.addEventListener('mouseup', function() {
+  draggedCard = null;
 });
