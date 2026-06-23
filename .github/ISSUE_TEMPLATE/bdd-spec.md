@@ -15,7 +15,7 @@ RULES (enforced by the guardrail — see features/AUTHORING.md):
 
 TO TRIGGER TEST GENERATION:
   Once the spec is ready and reviewed, add a comment on this issue containing
-  `@generate-tests`. That runs the guardrail and, if it passes, opens a PR with
+  `@go-develop`. That runs the guardrail and, if it passes, opens a PR with
   the generated pytest-bdd tests.
 -->
 

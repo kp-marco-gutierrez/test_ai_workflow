@@ -27,18 +27,15 @@ unit**. The guardrail rejects a spec and prints a suggested breakdown when:
 Rule of thumb: if you can't describe the capability in one sentence, split it
 into multiple `.feature` files.
 
-## Triggering generation
+## Triggering the pipeline
 
-Add the `@generate-tests` tag above the `Feature:` and push. The
-**Generate BDD Tests** workflow runs the guardrail, then has AI1 generate
-pytest-bdd step definitions under `tests/step_defs/`.
+File the spec as a GitHub Issue (the **BDD Spec** issue template) and, once it's
+ready and reviewed, comment **`@go-develop`** on the issue. That one comment
+drives the whole pipeline: validate the spec → AI1 writes tests → tests must
+fail → AI-Red-Team reviews the tests → AI2 implements until tests pass → ChatGPT
+code review (with a fix loop) → approve → full CI → squash-merge.
 
-```gherkin
-@generate-tests
-Feature: ...
-```
-
-Run the guardrail locally before pushing:
+Run the guardrail locally before filing, if you like:
 
 ```bash
 python3 scripts/validate_spec.py features/

@@ -6,7 +6,7 @@
 #
 # HOW GENERATION IS TRIGGERED
 #   Specs are filed as GitHub Issues using the "BDD Spec" issue template, then
-#   a human comments `@generate-tests` on the issue. The spec-intake workflow
+#   a human comments `@go-develop` on the issue. The spec-intake workflow
 #   validates it and, if it passes, has AI1 generate pytest-bdd tests and open
 #   a PR. (This file is just a local example; the guardrail validates any
 #   .feature pushed or opened in a PR.)
