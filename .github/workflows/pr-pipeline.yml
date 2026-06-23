@@ -98,9 +98,9 @@ jobs:
         run: |
           pr=${{ github.event.pull_request.number }}
           if [ "${{ steps.run.outputs.passed }}" = "true" ]; then
-            gh pr comment "$pr" -b "🧪 **Tests** passed (deterministic gate) → proceeding to code review. ([run]($RUN_URL))"
+            bash scripts/retry.sh gh pr comment "$pr" -b "🧪 **Tests** passed (deterministic gate) → proceeding to code review. ([run]($RUN_URL))" || true
           else
-            gh pr comment "$pr" -b "🧪 **Tests** failing as expected → next: AI-Red-Team checks the tests against the spec, then Claude implements. ([run]($RUN_URL))"
+            bash scripts/retry.sh gh pr comment "$pr" -b "🧪 **Tests** failing as expected → next: AI-Red-Team checks the tests against the spec, then Claude implements. ([run]($RUN_URL))" || true
           fi
 
       - name: Upload test output
@@ -131,7 +131,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: gh pr comment ${{ github.event.pull_request.number }} -b "🔴 **Test QA** — ChatGPT is checking the tests against the spec… ([run]($RUN_URL))"
+        run: bash scripts/retry.sh gh pr comment ${{ github.event.pull_request.number }} -b "🔴 **Test QA** — ChatGPT is checking the tests against the spec… ([run]($RUN_URL))" || true
       - name: ChatGPT reviews tests vs spec
         id: tr
         env:
@@ -144,20 +144,20 @@ jobs:
       - name: Post test review
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh pr comment ${{ github.event.pull_request.number }} --body-file review.md
+        run: bash scripts/retry.sh gh pr comment ${{ github.event.pull_request.number }} --body-file review.md || true
       - name: Mark tests reviewed (on approve)
         if: steps.tr.outputs.verdict == 'APPROVE'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh pr edit ${{ github.event.pull_request.number }} --add-label tests-reviewed
-          gh pr comment ${{ github.event.pull_request.number }} -b "🔴 **Test QA** verdict: ✅ tests match the spec → Claude will implement."
+          bash scripts/retry.sh gh pr comment ${{ github.event.pull_request.number }} -b "🔴 **Test QA** verdict: ✅ tests match the spec → Claude will implement." || true
       - name: Note request-changes
         if: steps.tr.outputs.verdict == 'REQUEST_CHANGES'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh pr comment ${{ github.event.pull_request.number }} -b "🔴 **Test QA** verdict: 📝 tests need changes → Claude will revise the tests."
+          bash scripts/retry.sh gh pr comment ${{ github.event.pull_request.number }} -b "🔴 **Test QA** verdict: 📝 tests need changes → Claude will revise the tests." || true
 
   fix-tests:
     name: Claude revises the tests (AI1)
@@ -172,13 +172,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: gh pr comment ${{ github.event.pull_request.number }} -b "✍️ **Revise tests** — Claude (AI1) is addressing the test review… ([run]($RUN_URL))"
+        run: bash scripts/retry.sh gh pr comment ${{ github.event.pull_request.number }} -b "✍️ **Revise tests** — Claude (AI1) is addressing the test review… ([run]($RUN_URL))" || true
       - name: Claude edits the tests
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           allowed_bots: "*"
-          claude_args: '--allowed-tools "Read,Write,Edit,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(python3:*)"'
+          claude_args: >-
+            ${{ vars.CLAUDE_MODEL != '' && format('--model {0} ', vars.CLAUDE_MODEL) || '' }}--allowed-tools "Read,Write,Edit,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(python3:*)"
           prompt: |
             You are AI1 on PR #${{ github.event.pull_request.number }}. The
             AI-Red-Team (ChatGPT) reviewed the generated tests against the spec
@@ -227,7 +228,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: gh pr comment ${{ github.event.pull_request.number }} -b "🛠️ **Develop** — Claude is implementing to make the tests pass… ([run]($RUN_URL))"
+        run: bash scripts/retry.sh gh pr comment ${{ github.event.pull_request.number }} -b "🛠️ **Develop** — Claude is implementing to make the tests pass… ([run]($RUN_URL))" || true
       - name: Claude implements
         uses: anthropics/claude-code-action@v1
         with:
@@ -235,7 +236,8 @@ jobs:
           # The pipeline is bot-driven (AI creates/labels/pushes), so the
           # triggering actor is a bot — allow it.
           allowed_bots: "*"
-          claude_args: '--allowed-tools "Read,Write,Edit,Glob,Grep,Bash"'
+          claude_args: >-
+            ${{ vars.CLAUDE_MODEL != '' && format('--model {0} ', vars.CLAUDE_MODEL) || '' }}--allowed-tools "Read,Write,Edit,Glob,Grep,Bash"
           prompt: |
             You are AI2 (the implementer) on PR #${{ github.event.pull_request.number }}.
             The committed BDD tests currently FAIL because the app does not exist
@@ -270,7 +272,7 @@ jobs:
           feature=$(echo "$title" | sed -E 's/^AI1: tests for #[0-9]+ +//')
           if [ "$feature" != "$title" ] && [ -n "$feature" ]; then
             gh pr edit "$pr" --title "feat: $feature"
-            gh pr comment "$pr" -b "📝 PR title updated to \`feat: $feature\` (implementation added)."
+            bash scripts/retry.sh gh pr comment "$pr" -b "📝 PR title updated to \`feat: $feature\` (implementation added)." || true
           fi
 
   review:
@@ -295,7 +297,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: gh pr comment ${{ github.event.pull_request.number }} -b "📖 Tests green — PR marked **ready**. 👀 **Code review** — ChatGPT is reviewing the implementation… ([run]($RUN_URL))"
+        run: bash scripts/retry.sh gh pr comment ${{ github.event.pull_request.number }} -b "📖 Tests green — PR marked **ready**. 👀 **Code review** — ChatGPT is reviewing the implementation… ([run]($RUN_URL))" || true
       - name: ChatGPT code review
         id: cr
         env:
@@ -308,15 +310,15 @@ jobs:
       - name: Post review comment
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh pr comment ${{ github.event.pull_request.number }} --body-file review.md
+        run: bash scripts/retry.sh gh pr comment ${{ github.event.pull_request.number }} --body-file review.md || true
       - name: Comment — review verdict
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           if [ "${{ steps.cr.outputs.verdict }}" = "APPROVE" ]; then
-            gh pr comment ${{ github.event.pull_request.number }} -b "👀 **Code review** verdict: ✅ APPROVE → approving, running full CI, and squash-merging."
+            bash scripts/retry.sh gh pr comment ${{ github.event.pull_request.number }} -b "👀 **Code review** verdict: ✅ APPROVE → approving, running full CI, and squash-merging." || true
           else
-            gh pr comment ${{ github.event.pull_request.number }} -b "👀 **Code review** verdict: 📝 REQUEST_CHANGES → Claude will address the comments."
+            bash scripts/retry.sh gh pr comment ${{ github.event.pull_request.number }} -b "👀 **Code review** verdict: 📝 REQUEST_CHANGES → Claude will address the comments." || true
           fi
       - name: Save review for the address step
         if: steps.cr.outputs.verdict == 'REQUEST_CHANGES'
@@ -346,7 +348,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: gh pr comment ${{ github.event.pull_request.number }} -b "✍️ **Address review** — Claude is editing the implementation to address the review comments… ([run]($RUN_URL))"
+        run: bash scripts/retry.sh gh pr comment ${{ github.event.pull_request.number }} -b "✍️ **Address review** — Claude is editing the implementation to address the review comments… ([run]($RUN_URL))" || true
       - name: Claude edits the code
         uses: anthropics/claude-code-action@v1
         with:
@@ -354,7 +356,8 @@ jobs:
           # The pipeline is bot-driven (AI creates/labels/pushes), so the
           # triggering actor is a bot — allow it.
           allowed_bots: "*"
-          claude_args: '--allowed-tools "Read,Write,Edit,Glob,Grep,Bash"'
+          claude_args: >-
+            ${{ vars.CLAUDE_MODEL != '' && format('--model {0} ', vars.CLAUDE_MODEL) || '' }}--allowed-tools "Read,Write,Edit,Glob,Grep,Bash"
           prompt: |
             You are AI2 on PR #${{ github.event.pull_request.number }}. ChatGPT
             (code reviewer) requested changes:
@@ -424,4 +427,4 @@ jobs:
           if [ -n "$issue" ]; then
             gh issue close "$issue" --reason completed -c "✅ Implemented and merged in #$pr — pipeline complete." || true
           fi
-          gh pr comment "$pr" -b "🚀 **Merged** — full CI passed, PR squash-merged${issue:+ and issue #$issue closed}. Pipeline complete."
+          bash scripts/retry.sh gh pr comment "$pr" -b "🚀 **Merged** — full CI passed, PR squash-merged${issue:+ and issue #$issue closed}. Pipeline complete." || true
