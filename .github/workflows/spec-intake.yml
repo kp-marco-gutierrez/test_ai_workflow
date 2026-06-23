@@ -35,11 +35,13 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Comment — pipeline started
+      - name: Mark issue in-development + announce
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: bash scripts/retry.sh gh issue comment ${{ github.event.issue.number }} -b "🚦 \`@go-develop\` received — **Spec intake (AI1)** validating the spec and generating tests… ([run]($RUN_URL))" || true
+        run: |
+          bash scripts/retry.sh gh issue edit ${{ github.event.issue.number }} --add-label in-development || true
+          bash scripts/retry.sh gh issue comment ${{ github.event.issue.number }} -b "🚦 \`@go-develop\` received — **Spec intake (AI1)** validating the spec and generating tests… ([run]($RUN_URL))" || true
 
       - name: Spec intake (AI1)
         uses: anthropics/claude-code-action@v1
