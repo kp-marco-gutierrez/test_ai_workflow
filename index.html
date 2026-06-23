@@ -4,84 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Trello-lite</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: sans-serif; background: #0052cc; color: #fff; min-height: 100vh; }
-    header { padding: 12px 16px; background: rgba(0,0,0,.15); }
-    h1 { font-size: 1.25rem; font-weight: 700; }
-    .board-container { display: flex; gap: 12px; padding: 16px; }
-    .column { background: rgba(255,255,255,.15); border-radius: 6px; padding: 12px; min-width: 220px; display: flex; flex-direction: column; gap: 8px; }
-    .column-header { font-size: 1rem; font-weight: 600; }
-    .cards-list { display: flex; flex-direction: column; gap: 6px; }
-    .card { background: #fff; color: #333; border-radius: 4px; padding: 8px 10px; font-size: 0.9rem; }
-    .add-card-form { display: flex; flex-direction: column; gap: 6px; }
-    input.card-input { border: none; border-radius: 4px; padding: 6px 8px; font-size: 0.875rem; width: 100%; }
-    button.add-card { background: rgba(255,255,255,.3); border: none; border-radius: 4px; padding: 6px 10px; color: #fff; cursor: pointer; font-size: 0.875rem; text-align: left; }
-    button.add-card:hover { background: rgba(255,255,255,.4); }
-    .error { background: #ffebe8; color: #ae2a19; border-radius: 4px; padding: 6px 8px; font-size: 0.8rem; display: none; }
-    .error.visible { display: block; }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header>
     <h1>Trello-lite</h1>
   </header>
-  <div class="board-container">
-    <div class="column">
-      <h2 class="column-header">To Do</h2>
-      <div class="cards-list"></div>
-      <div class="add-card-form">
-        <input class="card-input" type="text" placeholder="Card title…" aria-label="Card title">
-        <button class="add-card" type="button">Add card</button>
-        <div class="error" role="alert">Card title cannot be empty</div>
-      </div>
-    </div>
-    <div class="column">
-      <h2 class="column-header">Doing</h2>
-      <div class="cards-list"></div>
-      <div class="add-card-form">
-        <input class="card-input" type="text" placeholder="Card title…" aria-label="Card title">
-        <button class="add-card" type="button">Add card</button>
-        <div class="error" role="alert">Card title cannot be empty</div>
-      </div>
-    </div>
-    <div class="column">
-      <h2 class="column-header">Done</h2>
-      <div class="cards-list"></div>
-      <div class="add-card-form">
-        <input class="card-input" type="text" placeholder="Card title…" aria-label="Card title">
-        <button class="add-card" type="button">Add card</button>
-        <div class="error" role="alert">Card title cannot be empty</div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    document.querySelectorAll('.column').forEach(function(column) {
-      var input = column.querySelector('input.card-input');
-      var button = column.querySelector('button.add-card');
-      var cardsList = column.querySelector('.cards-list');
-      var errorEl = column.querySelector('.error');
-
-      function addCard() {
-        var title = input.value.trim();
-        if (!title) {
-          errorEl.classList.add('visible');
-          return;
-        }
-        errorEl.classList.remove('visible');
-        var card = document.createElement('div');
-        card.className = 'card';
-        card.textContent = title;
-        cardsList.appendChild(card);
-        input.value = '';
-      }
-
-      button.addEventListener('click', addCard);
-      input.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') addCard();
-      });
-    });
-  </script>
+  <div class="board-container"></div>
+  <script src="app.js"></script>
 </body>
 </html>
