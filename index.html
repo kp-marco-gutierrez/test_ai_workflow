@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trello-lite</title>
+  <style>
+    body { font-family: sans-serif; background: #0079bf; margin: 0; padding: 16px; }
+    h1 { color: #fff; margin: 0 0 16px; }
+    #board { display: flex; gap: 12px; }
+    .column { background: #ebecf0; border-radius: 4px; padding: 8px; min-width: 200px; }
+    .column-header { font-weight: bold; margin-bottom: 8px; }
+    .card-list { min-height: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Trello-lite</h1>
+  <div id="board">
+    <div class="column">
+      <div class="column-header">To Do</div>
+      <div class="card-list"></div>
+    </div>
+    <div class="column">
+      <div class="column-header">Doing</div>
+      <div class="card-list"></div>
+    </div>
+    <div class="column">
+      <div class="column-header">Done</div>
+      <div class="card-list"></div>
+    </div>
+  </div>
+</body>
+</html>
