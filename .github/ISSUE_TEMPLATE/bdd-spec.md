@@ -13,13 +13,13 @@ RULES (enforced by the guardrail — see features/AUTHORING.md):
   - Every Scenario needs Given / When / Then (a Background Given counts).
   - Use concrete, checkable values (exact strings, numbers, named states).
 
-KEEP the `@generate-tests` tag below — it is what triggers AI test generation.
-When you submit this issue, the spec-intake workflow validates it and, if it
-passes, opens a PR with the generated pytest-bdd tests.
+TO TRIGGER TEST GENERATION:
+  Once the spec is ready and reviewed, add a comment on this issue containing
+  `@generate-tests`. That runs the guardrail and, if it passes, opens a PR with
+  the generated pytest-bdd tests.
 -->
 
 ```gherkin
-@generate-tests
 Feature: <capability name>
   As a <role>
   I want <goal>
