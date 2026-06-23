@@ -1,0 +1,71 @@
+name: Spec Intake (Issue -> Tests)
+
+# Issue-driven entry to the AI-only pipeline.
+# A BDD spec is filed as a GitHub Issue (see .github/ISSUE_TEMPLATE/bdd-spec.md).
+# When the issue carries the @generate-tests tag, this workflow runs the spec
+# guardrail (BDD format + task size). If it passes, AI1 saves the .feature file
+# and generates pytest-bdd tests, then opens a PR. If it fails, the validator
+# output (including a suggested breakdown) is commented back on the issue.
+#
+# Uses claude-code-action@v1, which DOES support `issues` events.
+
+on:
+  issues:
+    types: [opened, labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  intake:
+    name: Validate spec and generate tests
+    if: |
+      (github.event.action == 'opened' && contains(github.event.issue.body, '@generate-tests')) ||
+      (github.event.action == 'labeled' && github.event.label.name == 'generate-tests')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Spec intake (AI1)
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: '--allowed-tools "Read,Write,Edit,Glob,Grep,Bash(python3:*),Bash(git:*),Bash(gh:*)"'
+          prompt: |
+            You are the spec-intake agent (AI1) in an automated BDD pipeline.
+
+            Issue #${{ github.event.issue.number }} contains a BDD spec inside a
+            ```gherkin code block. Do the following, in order:
+
+            1. Extract the Gherkin spec from the issue body — the `Feature:` block
+               including its leading `@generate-tests` tag. Strip the markdown
+               code fences and any <placeholder> text the author left unfilled.
+            2. Save it to features/<slug>.feature, where <slug> is a kebab-case
+               name derived from the Feature title.
+            3. GUARDRAIL — run exactly:
+                 python3 scripts/validate_spec.py features/<slug>.feature
+               - If it exits non-zero (invalid BDD format, or task too large):
+                 post a comment on issue #${{ github.event.issue.number }} with
+                 the full validator output (it includes any suggested breakdown),
+                 ask the author to revise the issue, delete the .feature file you
+                 created, and STOP. Do NOT generate tests or open a PR.
+               - If it passes, continue.
+            4. Generate pytest-bdd step definitions in
+               tests/step_defs/test_<slug>.py: bind every scenario with
+               `scenarios('../../features/<slug>.feature')`, implement each
+               @given/@when/@then against the exact step text, and assert the
+               Then outcomes precisely.
+            5. The tests MUST call into INTENDED implementation modules that do
+               NOT exist yet (e.g. `from app.<x> import ...`). Write NO
+               implementation code — that is AI2's job. Tests must fail when run
+               now (the "dry run must fail" gate). Do not skip/xfail.
+            6. Open a pull request adding the .feature file and the tests:
+                 - title: "AI1: tests for #${{ github.event.issue.number }} <Feature>"
+                 - body: "Closes #${{ github.event.issue.number }}". Note the
+                   tests are expected to fail until AI2 implements the code.
+            7. Comment the PR link back on the issue.
