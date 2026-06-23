@@ -93,7 +93,7 @@
   }
 
   function createCardEl(title, currentColumn) {
-    var card = makeEl('div', {className: 'card', draggable: true});
+    var card = makeEl('div', {className: 'card'});
 
     // dragend is the safety-net for HTML5 drag that ends without a drop target.
     card.addEventListener('dragstart', function(e) {
