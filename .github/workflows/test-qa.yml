@@ -1,0 +1,127 @@
+name: Test QA (dry-run + AI-Red-Team review)
+
+# Steps 3 + 4 of the AI-only pipeline, run on the AI1 test-authoring PR
+# (marked with the `ai-tests` label):
+#
+#   dry-run  — run the generated tests against the not-yet-implemented codebase;
+#              they MUST fail (proves they aren't auto-passing). Step 4.
+#   review   — ChatGPT (AI-Red-Team) critiques the tests against the spec and
+#              comments on the PR. Step 3.
+#   address  — if the review requests changes, Claude (AI1) edits the tests to
+#              address them and pushes to the PR branch.
+#
+# The push from `address` re-triggers this workflow (synchronize), giving the
+# adversarial review loop. See note at bottom about bounding it.
+
+on:
+  pull_request:
+    types: [labeled, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  dry-run:
+    name: Dry run (tests MUST fail)
+    if: contains(github.event.pull_request.labels.*.name, 'ai-tests')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run tests and require failure
+        run: |
+          set +e
+          if [ -f package.json ]; then
+            npm ci || npm install
+            npx --yes playwright install --with-deps chromium || true
+            npx cucumber-js
+          else
+            pip install -r requirements.txt
+            pytest -q
+          fi
+          code=$?
+          set -e
+          if [ "$code" -eq 0 ]; then
+            echo "::error::Tests PASSED against an unimplemented codebase — they are auto-passing. Dry-run gate FAILED."
+            exit 1
+          fi
+          echo "Tests failed as required (exit $code). Dry-run gate passed."
+
+  review:
+    name: AI-Red-Team review (ChatGPT)
+    needs: dry-run
+    runs-on: ubuntu-latest
+    outputs:
+      verdict: ${{ steps.review.outputs.verdict }}
+      review: ${{ steps.review.outputs.review }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Review tests against the spec
+        id: review
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-4o' }}
+        run: |
+          verdict="$(python3 scripts/chatgpt_review.py)"
+          echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+          {
+            echo "review<<REVIEW_EOF"
+            cat review.md
+            echo "REVIEW_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post review comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr comment ${{ github.event.pull_request.number }} --body-file review.md
+
+  address:
+    name: Claude addresses the review
+    needs: review
+    if: needs.review.outputs.verdict == 'REQUEST_CHANGES'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Claude edits the tests
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: '--allowed-tools "Read,Write,Edit,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(python3:*)"'
+          prompt: |
+            AI-Red-Team (ChatGPT) reviewed the generated tests against the BDD
+            spec on PR #${{ github.event.pull_request.number }} and requested
+            changes:
+
+            ${{ needs.review.outputs.review }}
+
+            Address the VALID points by editing ONLY the test files (touch a
+            .feature only if the review identifies a genuine spec/test mismatch
+            that belongs there). Do NOT write implementation code — the tests
+            must still FAIL the dry run. Do not skip/xfail or weaken assertions
+            to pass. Then:
+              - run `python3 scripts/validate_spec.py features/` and make sure it
+                still passes,
+              - commit your changes to this PR branch (head:
+                ${{ github.event.pull_request.head.ref }}),
+              - reply to the PR with a short summary of what you changed and any
+                review points you intentionally did not act on, and why.
