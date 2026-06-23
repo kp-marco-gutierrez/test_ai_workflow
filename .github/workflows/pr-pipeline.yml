@@ -111,7 +111,7 @@ jobs:
           path: test-output.txt
           retention-days: 3
 
-  test-qa:
+  test_qa:
     name: AI-Red-Team review (tests vs spec)
     needs: tests
     # Only while authoring tests (tests still failing) and not yet approved.
@@ -160,8 +160,8 @@ jobs:
 
   fix-tests:
     name: Claude revises the tests (AI1)
-    needs: [tests, test-qa]
-    if: needs.test-qa.outputs.verdict == 'REQUEST_CHANGES'
+    needs: [tests, test_qa]
+    if: needs.test_qa.outputs.verdict == 'REQUEST_CHANGES'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -183,7 +183,7 @@ jobs:
             AI-Red-Team (ChatGPT) reviewed the generated tests against the spec
             and requested changes:
 
-            ${{ needs.test-qa.outputs.review }}
+            ${{ needs.test_qa.outputs.review }}
 
             Address the valid points by editing the TESTS and/or the .feature
             spec only. Write NO implementation code — the tests must still FAIL
@@ -193,14 +193,14 @@ jobs:
 
   develop:
     name: Claude develops (until tests pass)
-    needs: [tests, test-qa]
+    needs: [tests, test_qa]
     # Implement only once the tests have been reviewed (label present from a
     # prior round) or were just approved in this run.
     if: |
       always() &&
       needs.tests.result == 'success' &&
       needs.tests.outputs.passed == 'false' &&
-      (contains(github.event.pull_request.labels.*.name, 'tests-reviewed') || needs.test-qa.outputs.verdict == 'APPROVE')
+      (contains(github.event.pull_request.labels.*.name, 'tests-reviewed') || needs.test_qa.outputs.verdict == 'APPROVE')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
