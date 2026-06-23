@@ -61,3 +61,9 @@ button.add-card:hover { background: rgba(255,255,255,.4); }
   display: none;
 }
 .error.visible { display: block; }
+.load-error {
+  background: #fef2f2;
+  color: #991b1b;
+  padding: 8px 16px;
+  font-size: 0.875rem;
+}

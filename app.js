@@ -77,6 +77,7 @@
       if (saved) return JSON.parse(saved);
     } catch (e) {
       console.warn('Failed to load saved board state:', e);
+      return { _corrupt: true };
     }
     return null;
   }
@@ -332,6 +333,14 @@
 
   var board = document.querySelector('.board-container');
   var savedState = loadBoard();
+  if (savedState && savedState._corrupt) {
+    var loadErrorEl = makeEl('p', {
+      className: 'load-error',
+      textContent: 'Your saved board could not be loaded. Starting with a fresh board.'
+    });
+    board.parentNode.insertBefore(loadErrorEl, board);
+    savedState = null;
+  }
   if (savedState && Array.isArray(savedState._columns) && savedState._columns.length) {
     COLUMNS = savedState._columns.slice();
   }
