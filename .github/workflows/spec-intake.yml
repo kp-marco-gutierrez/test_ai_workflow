@@ -61,15 +61,19 @@ jobs:
                  ask the author to revise the issue, delete the .feature file you
                  created, and STOP. Do NOT generate tests or open a PR.
                - If it passes, continue.
-            4. Generate pytest-bdd step definitions in
-               tests/step_defs/test_<slug>.py: bind every scenario with
-               `scenarios('../../features/<slug>.feature')`, implement each
-               @given/@when/@then against the exact step text, and assert the
-               Then outcomes precisely.
-            5. The tests MUST call into INTENDED implementation modules that do
-               NOT exist yet (e.g. `from app import create_app`). Write NO
-               implementation code — that is AI2's job. Tests must fail when run
-               now (the "dry run must fail" gate). Do not skip/xfail.
+            4. Generate executable BDD tests that exercise EVERY scenario and
+               step in the spec, asserting the Then outcomes precisely. Choose
+               the test stack that fits the app the issue describes — e.g. a
+               GitHub Pages app is a static, client-side site, so test it by
+               loading index.html in a headless browser. Keep the tests next to
+               the spec under a conventional location for that stack.
+            5. The tests run against an app that does NOT exist yet, so they
+               MUST fail now (the "dry run must fail" gate) — do not skip/xfail
+               or weaken them. Write ONLY the tests and the .feature spec. Do
+               NOT write the implementation OR any project scaffold (package
+               manifest, test config, index.html, etc.) — AI2 creates all of
+               that, wires the project's standard test command to run your
+               tests, and makes them pass.
             6. Open a DRAFT pull request adding the .feature file and the tests
                (use `gh pr create --draft`). It MUST be a draft so it can't be
                merged before it has passed the dry-run gate and AI-Red-Team
