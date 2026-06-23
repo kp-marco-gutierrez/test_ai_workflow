@@ -114,6 +114,17 @@
       draggedCard = card;
     });
 
+    var deleteBtn = makeEl('button', {
+      className: 'delete',
+      type: 'button',
+      textContent: 'Delete'
+    });
+    deleteBtn.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+    deleteBtn.addEventListener('click', function() {
+      card.remove();
+      saveBoard();
+    });
+
     var titleSpan = makeEl('span', {className: 'card-title', textContent: title});
     card.appendChild(titleSpan);
 
@@ -180,6 +191,7 @@
     });
 
     card.appendChild(select);
+    card.appendChild(deleteBtn);
     return card;
   }
 
@@ -347,6 +359,55 @@
   COLUMNS.forEach(function(name) {
     var savedCards = savedState ? (savedState[name] || []) : [];
     board.appendChild(createColumnEl(name, savedCards));
+  });
+
+  // Add-list form — appears after the columns inside .board-container.
+  var addListSection = makeEl('div', {className: 'add-list-section'});
+
+  var listInput = makeEl('input', {
+    className: 'list-input',
+    type: 'text',
+    placeholder: 'New list name'
+  });
+  listInput.setAttribute('aria-label', 'New list name');
+  addListSection.appendChild(listInput);
+
+  var addListBtn = makeEl('button', {
+    className: 'add-list add-list-btn',
+    type: 'button',
+    textContent: 'Add list'
+  });
+  addListSection.appendChild(addListBtn);
+
+  var listError = makeEl('div', {
+    className: 'error',
+    textContent: 'List name cannot be empty'
+  });
+  listError.setAttribute('role', 'alert');
+  addListSection.appendChild(listError);
+
+  board.appendChild(addListSection);
+
+  function addList() {
+    var name = sanitizeInput(listInput.value);
+    if (!name) {
+      listError.textContent = 'List name cannot be empty';
+      listError.classList.add('visible');
+      return;
+    }
+    listError.classList.remove('visible');
+    COLUMNS.push(name);
+    board.insertBefore(createColumnEl(name, []), addListSection);
+    listInput.value = '';
+    saveBoard();
+  }
+
+  addListBtn.addEventListener('click', addList);
+  listInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') addList();
+  });
+  listInput.addEventListener('input', function() {
+    listError.classList.remove('visible');
   });
 
   // Global cleanup: clear draggedCard if mouse released outside any column.
