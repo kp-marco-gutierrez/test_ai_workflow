@@ -101,3 +101,8 @@ button.add-card:hover { background: rgba(255,255,255,.4); }
   display: none;
 }
 .rename-error.visible { display: block; }
+.column-header.renamed {
+  outline: 2px solid rgba(255,255,255,.8);
+  border-radius: 3px;
+  transition: outline 0.6s ease-out;
+}

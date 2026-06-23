@@ -4,8 +4,11 @@ var draggedCard = null;
 var _cardCounter = 0;
 
 function sanitizeInput(value) {
-  // Use a temporary DOM node to decode any encoded entities first,
-  // then strip tags and dangerous patterns from the resulting text.
+  // Setting textContent on a DOM node is the safe, browser-native way to
+  // obtain plain text — it avoids the escaping bugs that hand-rolled regex
+  // strips inevitably introduce (e.g. nested encodings, entity variants).
+  // The subsequent regex passes remove any residual angle-bracket fragments
+  // and event-handler attributes that survived as literal text.
   var tmp = document.createElement('div');
   tmp.textContent = value.trim();
   return tmp.textContent
@@ -39,18 +42,42 @@ function saveBoard() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+function showStorageError(message) {
+  var banner = document.getElementById('storage-error-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'storage-error-banner';
+    banner.setAttribute('role', 'alert');
+    banner.style.cssText = 'background:#c0392b;color:#fff;padding:8px 16px;text-align:center;position:fixed;top:0;left:0;right:0;z-index:9999;';
+    document.body.prepend(banner);
+  }
+  banner.textContent = message;
+}
+
 function loadBoard() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) return JSON.parse(saved);
   } catch (e) {
     console.error('Failed to load board state — localStorage may be corrupted or unavailable. Starting with an empty board.', e);
+    showStorageError('Could not load your saved board — storage may be unavailable or corrupted. Starting with an empty board.');
   }
   return null;
 }
 
+// Reusable helper: show or clear an error element associated with a field.
+function setFieldError(errorEl, message) {
+  if (message) {
+    errorEl.textContent = message;
+    errorEl.classList.add('visible');
+  } else {
+    errorEl.textContent = '';
+    errorEl.classList.remove('visible');
+  }
+}
+
 function moveCardToColumn(cardEl, targetColEl, cardsList, colName) {
-  if (!cardEl || cardEl.closest('.column') === targetColEl) return;
+  if (!cardEl || !cardsList || !colName || cardEl.closest('.column') === targetColEl) return;
   cardsList.appendChild(cardEl);
   var sel = cardEl.querySelector('select');
   if (sel) sel.value = colName;
@@ -78,15 +105,12 @@ function createCardElement(title, currentColumn) {
 
   // Mouse-based drag fallback for environments where HTML5 dragstart
   // is not reliably triggered (e.g. Playwright's CDP simulation).
-  // Use capture phase so the select's stopPropagation on mousedown
-  // cannot block this from running.
+  // Capture phase ensures the select's mousedown stopPropagation cannot
+  // prevent this from running — a separate bubble-phase mousedown would
+  // be silently swallowed by the select, so capture is the only correct hook.
   card.addEventListener('pointerdown', function() {
     draggedCard = card;
   }, { capture: true });
-
-  card.addEventListener('mousedown', function() {
-    draggedCard = card;
-  });
 
   var titleSpan = createElementWithProperties('span', {className: 'card-title', textContent: title});
   card.appendChild(titleSpan);
@@ -173,20 +197,23 @@ function createColumnEl(name, savedCards) {
       var isDuplicate = newName !== currentName && COLUMNS.indexOf(newName) !== -1;
 
       if (isDuplicate && showDuplicateError) {
-        renameError.textContent = 'Column name "' + newName + '" already exists';
-        renameError.classList.add('visible');
+        setFieldError(renameError, 'Column name "' + newName + '" already exists');
         renameInput.focus();
         return; // keep input open so the user can correct the name
       }
 
       done = true;
-      renameError.classList.remove('visible');
+      setFieldError(renameError, '');
 
-      if (newName && !isDuplicate && newName !== currentName) {
+      var renamed = newName && !isDuplicate && newName !== currentName;
+      if (renamed) {
         var idx = COLUMNS.indexOf(currentName);
         if (idx !== -1) COLUMNS[idx] = newName;
         header.textContent = newName;
         name = newName;
+        // Brief visual confirmation that the rename was applied.
+        header.classList.add('renamed');
+        setTimeout(function() { header.classList.remove('renamed'); }, 600);
       }
       header.style.display = '';
       renameInput.remove();
@@ -199,7 +226,7 @@ function createColumnEl(name, savedCards) {
       } else if (e.key === 'Escape') {
         if (done) return;
         done = true;
-        renameError.classList.remove('visible');
+        setFieldError(renameError, '');
         header.style.display = '';
         renameInput.remove();
       }
@@ -278,10 +305,10 @@ function createColumnEl(name, savedCards) {
   function addCard() {
     const title = sanitizeInput(input.value);
     if (!title) {
-      errorEl.classList.add('visible');
+      setFieldError(errorEl, 'Card title cannot be empty');
       return;
     }
-    errorEl.classList.remove('visible');
+    setFieldError(errorEl, '');
     cardsList.appendChild(createCardElement(title, name));
     input.value = '';
     saveBoard();
