@@ -178,7 +178,8 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           allowed_bots: "*"
-          claude_args: '--allowed-tools "Read,Write,Edit,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(python3:*)"'
+          claude_args: >-
+            ${{ vars.CLAUDE_MODEL != '' && format('--model {0} ', vars.CLAUDE_MODEL) || '' }}--allowed-tools "Read,Write,Edit,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(python3:*)"
           prompt: |
             You are AI1 on PR #${{ github.event.pull_request.number }}. The
             AI-Red-Team (ChatGPT) reviewed the generated tests against the spec
@@ -235,7 +236,8 @@ jobs:
           # The pipeline is bot-driven (AI creates/labels/pushes), so the
           # triggering actor is a bot — allow it.
           allowed_bots: "*"
-          claude_args: '--allowed-tools "Read,Write,Edit,Glob,Grep,Bash"'
+          claude_args: >-
+            ${{ vars.CLAUDE_MODEL != '' && format('--model {0} ', vars.CLAUDE_MODEL) || '' }}--allowed-tools "Read,Write,Edit,Glob,Grep,Bash"
           prompt: |
             You are AI2 (the implementer) on PR #${{ github.event.pull_request.number }}.
             The committed BDD tests currently FAIL because the app does not exist
@@ -354,7 +356,8 @@ jobs:
           # The pipeline is bot-driven (AI creates/labels/pushes), so the
           # triggering actor is a bot — allow it.
           allowed_bots: "*"
-          claude_args: '--allowed-tools "Read,Write,Edit,Glob,Grep,Bash"'
+          claude_args: >-
+            ${{ vars.CLAUDE_MODEL != '' && format('--model {0} ', vars.CLAUDE_MODEL) || '' }}--allowed-tools "Read,Write,Edit,Glob,Grep,Bash"
           prompt: |
             You are AI2 on PR #${{ github.event.pull_request.number }}. ChatGPT
             (code reviewer) requested changes:
