@@ -173,6 +173,19 @@ jobs:
             Commit everything (scaffold + implementation) to this PR branch
             (${{ github.event.pull_request.head.ref }}) and push.
 
+      - name: Adjust PR title to reflect the implementation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pr=${{ github.event.pull_request.number }}
+          title=$(gh pr view "$pr" --json title -q .title)
+          # Strip the "AI1: tests for #<issue> " prefix to get the feature name.
+          feature=$(echo "$title" | sed -E 's/^AI1: tests for #[0-9]+ +//')
+          if [ "$feature" != "$title" ] && [ -n "$feature" ]; then
+            gh pr edit "$pr" --title "feat: $feature"
+            gh pr comment "$pr" -b "📝 PR title updated to \`feat: $feature\` (implementation added)."
+          fi
+
   review:
     name: Code review (ChatGPT) + mark ready
     needs: tests
