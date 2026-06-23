@@ -2,16 +2,19 @@ name: Spec Intake (Issue -> Tests)
 
 # Issue-driven entry to the AI-only pipeline.
 # A BDD spec is filed as a GitHub Issue (see .github/ISSUE_TEMPLATE/bdd-spec.md).
-# When the issue carries the @generate-tests tag, this workflow runs the spec
-# guardrail (BDD format + task size). If it passes, AI1 saves the .feature file
-# and generates pytest-bdd tests, then opens a PR. If it fails, the validator
-# output (including a suggested breakdown) is commented back on the issue.
+# Generation is triggered by a human commenting `@generate-tests` on the issue —
+# the spec is authored first, reviewed, then explicitly kicked off.
 #
-# Uses claude-code-action@v1, which DOES support `issues` events.
+# This workflow runs the spec guardrail (BDD format + task size). If it passes,
+# AI1 saves the .feature file and generates pytest-bdd tests, then opens a PR.
+# If it fails, the validator output (including a suggested breakdown) is
+# commented back on the issue.
+#
+# Uses claude-code-action@v1, which supports `issue_comment` events.
 
 on:
-  issues:
-    types: [opened, labeled]
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: write
@@ -22,9 +25,10 @@ permissions:
 jobs:
   intake:
     name: Validate spec and generate tests
+    # Only on issue comments (not PR comments) that contain the trigger phrase.
     if: |
-      (github.event.action == 'opened' && contains(github.event.issue.body, '@generate-tests')) ||
-      (github.event.action == 'labeled' && github.event.label.name == 'generate-tests')
+      github.event.issue.pull_request == null &&
+      contains(github.event.comment.body, '@generate-tests')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,12 +43,14 @@ jobs:
           prompt: |
             You are the spec-intake agent (AI1) in an automated BDD pipeline.
 
-            Issue #${{ github.event.issue.number }} contains a BDD spec inside a
-            ```gherkin code block. Do the following, in order:
+            A human commented `@generate-tests` on issue
+            #${{ github.event.issue.number }} to request test generation. The
+            issue BODY contains a BDD spec inside a ```gherkin code block. Do the
+            following, in order:
 
-            1. Extract the Gherkin spec from the issue body — the `Feature:` block
-               including its leading `@generate-tests` tag. Strip the markdown
-               code fences and any <placeholder> text the author left unfilled.
+            1. Extract the Gherkin spec from the issue body — the `Feature:`
+               block. Strip the markdown code fences and any <placeholder> text
+               the author left unfilled.
             2. Save it to features/<slug>.feature, where <slug> is a kebab-case
                name derived from the Feature title.
             3. GUARDRAIL — run exactly:
@@ -61,7 +67,7 @@ jobs:
                @given/@when/@then against the exact step text, and assert the
                Then outcomes precisely.
             5. The tests MUST call into INTENDED implementation modules that do
-               NOT exist yet (e.g. `from app.<x> import ...`). Write NO
+               NOT exist yet (e.g. `from app import create_app`). Write NO
                implementation code — that is AI2's job. Tests must fail when run
                now (the "dry run must fail" gate). Do not skip/xfail.
             6. Open a pull request adding the .feature file and the tests:

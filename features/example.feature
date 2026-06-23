@@ -1,26 +1,24 @@
 # =============================================================================
-# BDD SPEC TEMPLATE  (Step 1 of the AI-only pipeline)
+# BDD SPEC — EXAMPLE / REFERENCE  (Step 1 of the AI-only pipeline)
 # -----------------------------------------------------------------------------
-# This file is the *contract*. Everything downstream (tests, code, review) is
+# A spec is the *contract*. Everything downstream (tests, code, review) is
 # derived from it, so it must be well-formed and tightly scoped.
 #
 # HOW GENERATION IS TRIGGERED
-#   Add the `@generate-tests` tag (below) and push. The "Generate BDD Tests"
-#   workflow runs the spec guardrail, then has AI1 generate pytest-bdd step
-#   definitions from this spec.
+#   Specs are filed as GitHub Issues using the "BDD Spec" issue template, then
+#   a human comments `@generate-tests` on the issue. The spec-intake workflow
+#   validates it and, if it passes, has AI1 generate pytest-bdd tests and open
+#   a PR. (This file is just a local example; the guardrail validates any
+#   .feature pushed or opened in a PR.)
 #
 # THE GUARDRAIL (scripts/validate_spec.py) CHECKS TWO THINGS
 #   1. BDD format  — a Feature with at least one Scenario, and every Scenario
 #                    has Given / When / Then (a Background Given counts).
 #   2. Task size   — the spec is small enough to build and test as ONE
-#                    self-contained unit. If it's too big, the guardrail fails
-#                    and prints a suggested breakdown into smaller specs.
-#                    Keep it to a single Feature, a handful of scenarios.
-#
-# Replace the example below with your real spec; keep the @generate-tests tag.
+#                    self-contained unit; otherwise it prints a suggested
+#                    breakdown. Keep it to a single Feature, a few scenarios.
 # =============================================================================
 
-@generate-tests
 Feature: User login
   As a registered user
   I want to authenticate with my email and password

@@ -1,0 +1,31 @@
+name: Spec Guardrail
+
+# Deterministic CI gate (no AI, no model — pure Python, so it can never hit an
+# API/model error). Every .feature file entering the repo must be well-formed
+# BDD and right-sized. Runs on pushes and PRs that touch a .feature file,
+# including the PRs that spec-intake.yml opens with AI-generated specs.
+
+on:
+  push:
+    paths:
+      - "**.feature"
+  pull_request:
+    paths:
+      - "**.feature"
+
+permissions:
+  contents: read
+
+jobs:
+  guardrail:
+    name: Validate specs (format + size)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate all specs (BDD format + task size)
+        run: python3 scripts/validate_spec.py features/
