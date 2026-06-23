@@ -6,6 +6,7 @@
   var SELECTOR_COLUMN_HEADER = '.column-header';
   var SELECTOR_CARDS_LIST = '.cards-list';
   var DRAG_MIME_TYPE = 'text/plain';
+  var MAX_CARD_TITLE_LENGTH = 50;
   var draggedCard = null;
 
   function sanitizeInput(value) {
@@ -66,6 +67,7 @@
         if (titleEl) state[colName].push(titleEl.textContent);
       });
     });
+    state._columns = COLUMNS.slice();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
@@ -302,6 +304,12 @@
     function addCard() {
       var title = sanitizeInput(input.value);
       if (!title) {
+        errorEl.textContent = 'Card title cannot be empty';
+        errorEl.classList.add('visible');
+        return;
+      }
+      if (title.length > MAX_CARD_TITLE_LENGTH) {
+        errorEl.textContent = 'Card title cannot exceed ' + MAX_CARD_TITLE_LENGTH + ' characters';
         errorEl.classList.add('visible');
         return;
       }
@@ -324,6 +332,9 @@
 
   var board = document.querySelector('.board-container');
   var savedState = loadBoard();
+  if (savedState && Array.isArray(savedState._columns) && savedState._columns.length) {
+    COLUMNS = savedState._columns.slice();
+  }
   COLUMNS.forEach(function(name) {
     var savedCards = savedState ? (savedState[name] || []) : [];
     board.appendChild(createColumnEl(name, savedCards));
