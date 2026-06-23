@@ -25,7 +25,11 @@ function saveBoard() {
       if (titleEl) state[colName].push(titleEl.textContent);
     });
   });
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.error('Failed to save board:', e);
+  }
 }
 
 function loadBoard() {
@@ -133,6 +137,7 @@ function createColumnEl(name, savedCards) {
         if (idx !== -1) COLUMNS[idx] = newName;
         header.textContent = newName;
         name = newName;
+        saveBoard();
       }
       header.style.display = '';
       renameInput.remove();
@@ -255,7 +260,7 @@ function createAddListForm() {
 
   function addList() {
     var name = sanitizeInput(input.value);
-    if (!name) {
+    if (!name || COLUMNS.includes(name)) {
       errorEl.classList.add('visible');
       return;
     }
