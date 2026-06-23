@@ -110,9 +110,11 @@
     // is not reliably triggered (e.g. Playwright's CDP simulation).
     // The global mouseup listener is the safety-net for mouse drags that
     // end outside any column's mouseup handler.
+    // Capture phase ensures this fires even when a child element (select,
+    // delete button) calls e.stopPropagation() in the bubble phase.
     card.addEventListener('mousedown', function() {
       draggedCard = card;
-    });
+    }, true);
 
     var deleteBtn = makeEl('button', {
       className: 'delete',
