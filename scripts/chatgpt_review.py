@@ -75,13 +75,23 @@ VERDICT: REQUEST_CHANGES
 Review the implementation against the spec and tests, as a senior reviewer. Be
 concrete and actionable — cite file and the relevant code for every point.
 
-1. Correctness — the code actually satisfies the spec's behavior (not just the
-   literal tests). Flag gaps or behavior the spec requires but code misses.
-2. DRY / simplicity — duplication, dead code, needless complexity.
-3. Architecture — sensible structure, separation, naming; for a static GitHub
-   Pages app: pure client-side, no backend, relative asset paths.
-4. Security — injection/XSS, unsafe DOM, secrets, unsafe defaults.
-5. Readability / maintainability.
+Review rigorously. The passing tests cover the spec's scenarios, but they do
+NOT prove the code is correct, secure, or maintainable in general — so look
+hard for anything that should be fixed before merge:
+- correctness bugs, missing edge cases, behavior the spec implies but the tests
+  don't pin,
+- security issues (injection/XSS, unsafe DOM, leaked secrets, unsafe defaults),
+- hard-constraint violations (static GitHub Pages app: client-side only, no
+  backend, relative asset paths),
+- genuine quality problems: confusing or dead code, poor structure,
+  duplication, unclear naming, missing error handling.
+
+If anything should be fixed, return `VERDICT: REQUEST_CHANGES` with specific,
+actionable points — Claude will fix them. Return `VERDICT: APPROVE` only when
+the code is correct, secure, and clean with nothing left worth fixing.
+**When in doubt, REQUEST_CHANGES** — do not wave issues through. Keep each point
+concrete (cite file + code), and don't re-raise something already addressed in
+a prior round.
 
 End your response with a final line that is EXACTLY one of:
 VERDICT: APPROVE
