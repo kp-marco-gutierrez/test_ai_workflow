@@ -1,9 +1,12 @@
 var COLUMNS = ['To Do', 'Doing', 'Done'];
 var STORAGE_KEY = 'trello-lite-board';
+var SELECTOR_COLUMN = '.column';
+var SELECTOR_CARD = '.card';
+var DRAG_MIME_TYPE = 'text/plain';
 var draggedCard = null;
 
 function sanitizeInput(value) {
-  return value.trim();
+  return value.replace(/<[^>]*>/g, '').trim();
 }
 
 // Utility: create an element and assign own properties in one call.
@@ -16,11 +19,11 @@ function makeEl(tag, props) {
 function saveBoard() {
   var state = {};
   COLUMNS.forEach(function(name) { state[name] = []; });
-  document.querySelectorAll('.column').forEach(function(col) {
+  document.querySelectorAll(SELECTOR_COLUMN).forEach(function(col) {
     var header = col.querySelector('.column-header');
     if (!header) return;
     var colName = header.textContent;
-    col.querySelectorAll('.card').forEach(function(card) {
+    col.querySelectorAll(SELECTOR_CARD).forEach(function(card) {
       var titleEl = card.querySelector('.card-title');
       if (titleEl) state[colName].push(titleEl.textContent);
     });
@@ -52,7 +55,7 @@ function createCardEl(title, currentColumn) {
   card.addEventListener('dragstart', function(e) {
     draggedCard = card;
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', title);
+    e.dataTransfer.setData(DRAG_MIME_TYPE, title);
   });
 
   card.addEventListener('dragend', function() {
@@ -83,11 +86,11 @@ function createCardEl(title, currentColumn) {
     editInput.focus();
     editInput.select();
 
-    var done = false;
+    var renameCompleted = false;
 
     function confirmRename() {
-      if (done) return;
-      done = true;
+      if (renameCompleted) return;
+      renameCompleted = true;
       var newTitle = sanitizeInput(editInput.value);
       if (newTitle) {
         titleSpan.textContent = newTitle;
@@ -103,8 +106,8 @@ function createCardEl(title, currentColumn) {
         e.preventDefault();
         confirmRename();
       } else if (e.key === 'Escape') {
-        if (done) return;
-        done = true;
+        if (renameCompleted) return;
+        renameCompleted = true;
         titleSpan.style.display = '';
         editInput.remove();
       }
@@ -129,7 +132,7 @@ function createCardEl(title, currentColumn) {
 
   select.addEventListener('change', function() {
     var targetName = select.value;
-    var columns = document.querySelectorAll('.column');
+    var columns = document.querySelectorAll(SELECTOR_COLUMN);
     for (var i = 0; i < columns.length; i++) {
       var header = columns[i].querySelector('.column-header');
       if (header && header.textContent === targetName) {
@@ -160,42 +163,62 @@ function createColumnEl(name, savedCards) {
     });
     renameInput.setAttribute('aria-label', 'List name');
 
+    var renameError = makeEl('div', {
+      className: 'error',
+      textContent: 'A column with that name already exists'
+    });
+    renameError.setAttribute('role', 'alert');
+
     header.style.display = 'none';
     col.insertBefore(renameInput, header);
+    col.insertBefore(renameError, header);
     renameInput.focus();
     renameInput.select();
 
-    var done = false;
+    var renameCompleted = false;
+
+    function closeRename() {
+      if (renameCompleted) return;
+      renameCompleted = true;
+      header.style.display = '';
+      renameInput.remove();
+      renameError.remove();
+    }
 
     function confirmRename() {
-      if (done) return;
-      done = true;
+      if (renameCompleted) return;
       var newName = sanitizeInput(renameInput.value);
       // Only rename if non-empty, changed, and not a duplicate column name.
       var isDuplicate = newName !== currentName && COLUMNS.indexOf(newName) !== -1;
-      if (newName && !isDuplicate && newName !== currentName) {
+      if (isDuplicate) {
+        renameError.classList.add('visible');
+        renameInput.select();
+        return;
+      }
+      renameError.classList.remove('visible');
+      if (newName && newName !== currentName) {
         var idx = COLUMNS.indexOf(currentName);
         if (idx !== -1) COLUMNS[idx] = newName;
         header.textContent = newName;
         name = newName;
       }
-      header.style.display = '';
-      renameInput.remove();
+      closeRename();
     }
+
+    renameInput.addEventListener('input', function() {
+      renameError.classList.remove('visible');
+    });
 
     renameInput.addEventListener('keydown', function(e) {
       if (e.key === 'Enter') {
         e.preventDefault();
         confirmRename();
       } else if (e.key === 'Escape') {
-        if (done) return;
-        done = true;
-        header.style.display = '';
-        renameInput.remove();
+        closeRename();
       }
     });
 
-    renameInput.addEventListener('blur', confirmRename);
+    renameInput.addEventListener('blur', closeRename);
   });
 
   col.addEventListener('dragover', function(e) {
@@ -211,7 +234,7 @@ function createColumnEl(name, savedCards) {
   // Mouse-based drop: handles drag_to() when HTML5 dragstart doesn't fire.
   col.addEventListener('mouseup', function() {
     if (!draggedCard) return;
-    var sourceCol = draggedCard.closest('.column');
+    var sourceCol = draggedCard.closest(SELECTOR_COLUMN);
     if (sourceCol !== col) {
       handleCardDrop(cardsList, name);
     }
@@ -268,6 +291,9 @@ function createColumnEl(name, savedCards) {
   button.addEventListener('click', addCard);
   input.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') addCard();
+  });
+  input.addEventListener('input', function() {
+    errorEl.classList.remove('visible');
   });
 
   return col;
