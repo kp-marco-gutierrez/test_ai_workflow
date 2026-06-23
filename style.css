@@ -37,3 +37,10 @@ button.add-card:hover { background: rgba(255,255,255,.4); }
   display: none;
 }
 .error.visible { display: block; }
+.rename-error {
+  background: #ffebe8;
+  color: #ae2a19;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 0.8rem;
+}

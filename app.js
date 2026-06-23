@@ -5,6 +5,7 @@ var ARIA_DELETE_LIST    = 'Delete list';
 var ARIA_LIST_NAME      = 'List name';
 var ARIA_CARD_TITLE     = 'Card title';
 var MSG_EMPTY_CARD      = 'Card title cannot be empty';
+var MSG_EMPTY_LIST_NAME = 'List name cannot be empty';
 
 // Centralised mutable list of column names (order determines render order).
 var COLUMNS = ['To Do', 'Doing', 'Done'];
@@ -27,6 +28,14 @@ function makeEl(tag, props) {
   if (props.role)            el.setAttribute('role', props.role);
   if (props.ariaLabel)       el.setAttribute('aria-label', props.ariaLabel);
   return el;
+}
+
+// Wires Enter → onConfirm and (if provided) Escape → onCancel on an input.
+function bindConfirmKeys(input, onConfirm, onCancel) {
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter')  { e.preventDefault(); onConfirm(); }
+    else if (onCancel && e.key === 'Escape') { e.preventDefault(); onCancel(); }
+  });
 }
 
 // Returns the first .column element whose header matches name, or null.
@@ -88,6 +97,9 @@ function createCardEl(title, currentColumn) {
 // getColName/setColName let the handler read and update the column name closure.
 function attachRenameHandler(header, col, getColName, setColName) {
   header.addEventListener('dblclick', function() {
+    var prevError = col.querySelector('.rename-error');
+    if (prevError) prevError.remove();
+
     var currentName = getColName();
     var renameInput = makeEl('input', {
       className: 'list-name-input',
@@ -107,27 +119,27 @@ function attachRenameHandler(header, col, getColName, setColName) {
       if (done) return;
       done = true;
       var newName = sanitizeInput(renameInput.value);
-      if (newName) {
-        var idx = COLUMNS.indexOf(currentName);
-        if (idx !== -1) COLUMNS[idx] = newName;
-        header.textContent = newName;
-        setColName(newName);
+      header.style.display = '';
+      renameInput.remove();
+      if (!newName) {
+        var errEl = makeEl('div', { className: 'rename-error', textContent: MSG_EMPTY_LIST_NAME });
+        col.insertBefore(errEl, header.nextSibling);
+        return;
       }
+      var idx = COLUMNS.indexOf(currentName);
+      if (idx !== -1) COLUMNS[idx] = newName;
+      header.textContent = newName;
+      setColName(newName);
+    }
+
+    function cancelRename() {
+      if (done) return;
+      done = true;
       header.style.display = '';
       renameInput.remove();
     }
 
-    renameInput.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        confirmRename();
-      } else if (e.key === 'Escape') {
-        if (done) return;
-        done = true;
-        header.style.display = '';
-        renameInput.remove();
-      }
-    });
+    bindConfirmKeys(renameInput, confirmRename, cancelRename);
     renameInput.addEventListener('blur', confirmRename);
   });
 }
@@ -161,9 +173,7 @@ function createAddCardForm(getColName, cardsList) {
   }
 
   button.addEventListener('click', addCard);
-  input.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') addCard();
-  });
+  bindConfirmKeys(input, addCard);
 
   return form;
 }
