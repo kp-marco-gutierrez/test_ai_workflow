@@ -1,6 +1,8 @@
 var COLUMNS = ['To Do', 'Doing', 'Done'];
 var STORAGE_KEY = 'trello-lite-board';
 
+// Returns trimmed input. XSS safety is enforced at the DOM layer by always
+// assigning user content via textContent, never innerHTML.
 function sanitizeInput(value) {
   return value.trim();
 }
@@ -28,6 +30,7 @@ function loadBoard() {
   return null;
 }
 
+// Builds a card element with a title label and a column-select control for moving.
 function createCardEl(title, currentColumn) {
   var card = document.createElement('div');
   card.className = 'card';
@@ -64,6 +67,9 @@ function createCardEl(title, currentColumn) {
   return card;
 }
 
+// Builds a column element with a header, delete button, rename-on-dblclick,
+// a cards list (optionally pre-populated from savedCards), and an add-card form.
+// Deleting the column calls col.remove(), which removes all child card elements.
 function createColumnEl(name, savedCards) {
   var col = document.createElement('div');
   col.className = 'column';
