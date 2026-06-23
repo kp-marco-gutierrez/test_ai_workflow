@@ -75,34 +75,33 @@ VERDICT: REQUEST_CHANGES
 Review the implementation against the spec and tests, as a senior reviewer. Be
 concrete and actionable — cite file and the relevant code for every point.
 
-Review rigorously. The passing tests cover the spec's scenarios, but they do
-NOT prove the code is correct, secure, or maintainable in general — so look
-hard for anything that should be fixed before merge:
-- correctness bugs, missing edge cases, behavior the spec implies but the tests
-  don't pin,
-- security issues (injection/XSS, unsafe DOM, leaked secrets, unsafe defaults),
-- hard-constraint violations (static GitHub Pages app: client-side only, no
+Decide ONE thing: does anything BLOCK merge? Block (REQUEST_CHANGES) ONLY for:
+- a correctness bug, or behavior that violates the spec,
+- a security vulnerability,
+- a hard-constraint violation (static GitHub Pages app: client-side only, no
   backend, relative asset paths),
-- genuine quality problems: confusing or dead code, poor structure,
-  duplication, unclear naming, missing error handling.
+- a clear defect that would bite users.
 
-ACCURACY (critical — verify before you flag):
-- Every issue MUST be demonstrably present in the code shown. Quote the exact
-  line. Do NOT raise hypothetical or generic concerns.
+Everything else is NON-BLOCKING — list it as an optional suggestion but still
+APPROVE: style, naming, duplication/DRY, structure ("consider encapsulating X",
+globals), semantic-HTML niceties, extra error messages or feedback the spec
+does NOT require, and any "nice to have" polish.
+
+ACCURACY (verify before flagging):
+- Every blocking issue MUST be demonstrably present in the code shown — quote
+  the exact line. No hypothetical or generic concerns.
 - Assigning user input via `textContent`, `createTextNode`, or element property
-  setters is XSS-SAFE — do NOT flag those as XSS. Only flag injection when raw
-  HTML is built (innerHTML / insertAdjacentHTML / document.write with untrusted
-  data).
-- If the code already handles something (e.g. input is already `.trim()`-ed),
-  do NOT raise it.
-- If "Prior review rounds" are shown below, do NOT re-raise any point the
-  current code already addresses — those are resolved.
+  setters is XSS-SAFE — do NOT flag it. Only flag injection for raw-HTML sinks
+  (innerHTML / insertAdjacentHTML / document.write with untrusted data).
+- Do not raise something the code already handles (e.g. input already
+  `.trim()`-ed), and if "Prior review rounds" appear below, do NOT re-raise a
+  point the current code now addresses.
+- Do not demand behavior the spec does not require.
 
-If a real, currently-present problem remains, return `VERDICT: REQUEST_CHANGES`
-with specific, actionable points — Claude will fix them. Return
-`VERDICT: APPROVE` only when the code is correct, secure, and clean with nothing
-genuinely left to fix. When in doubt about a REAL defect, REQUEST_CHANGES; but
-do not invent or re-raise issues just to have something to say.
+Return `VERDICT: REQUEST_CHANGES` only if a real BLOCKING issue is present now;
+otherwise `VERDICT: APPROVE` (noting any non-blocking suggestions). When unsure
+whether something is a real blocking defect or just polish, treat it as polish
+and APPROVE.
 
 End your response with a final line that is EXACTLY one of:
 VERDICT: APPROVE
