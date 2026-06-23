@@ -73,6 +73,18 @@ function createColumnEl(name, savedCards) {
   header.textContent = name;
   col.appendChild(header);
 
+  var deleteBtn = document.createElement('button');
+  deleteBtn.className = 'delete-list';
+  deleteBtn.setAttribute('aria-label', 'Delete list');
+  deleteBtn.textContent = '×';
+  deleteBtn.addEventListener('click', function() {
+    var idx = COLUMNS.indexOf(name);
+    if (idx !== -1) COLUMNS.splice(idx, 1);
+    col.remove();
+    saveBoard();
+  });
+  col.appendChild(deleteBtn);
+
   header.addEventListener('dblclick', function() {
     var currentName = header.textContent;
 
