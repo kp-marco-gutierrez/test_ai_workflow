@@ -93,7 +93,7 @@
   }
 
   function createCardEl(title, currentColumn) {
-    var card = makeEl('div', {className: 'card', draggable: true});
+    var card = makeEl('div', {className: 'card'});
 
     // dragend is the safety-net for HTML5 drag that ends without a drop target.
     card.addEventListener('dragstart', function(e) {
@@ -110,8 +110,21 @@
     // is not reliably triggered (e.g. Playwright's CDP simulation).
     // The global mouseup listener is the safety-net for mouse drags that
     // end outside any column's mouseup handler.
+    // Capture phase ensures this fires even when a child element (select,
+    // delete button) calls e.stopPropagation() in the bubble phase.
     card.addEventListener('mousedown', function() {
       draggedCard = card;
+    }, true);
+
+    var deleteBtn = makeEl('button', {
+      className: 'delete',
+      type: 'button',
+      textContent: 'Delete'
+    });
+    deleteBtn.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+    deleteBtn.addEventListener('click', function() {
+      card.remove();
+      saveBoard();
     });
 
     var titleSpan = makeEl('span', {className: 'card-title', textContent: title});
@@ -180,6 +193,7 @@
     });
 
     card.appendChild(select);
+    card.appendChild(deleteBtn);
     return card;
   }
 
