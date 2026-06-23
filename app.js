@@ -1,4 +1,5 @@
 var COLUMNS = ['To Do', 'Doing', 'Done'];
+var draggedCard = null;
 
 function sanitizeInput(value) {
   // Strip leading/trailing whitespace; textContent assignment below prevents XSS
@@ -8,6 +9,16 @@ function sanitizeInput(value) {
 function createCardEl(title, currentColumn) {
   var card = document.createElement('div');
   card.className = 'card';
+  card.draggable = true;
+
+  card.addEventListener('dragstart', function(e) {
+    draggedCard = card;
+    e.dataTransfer.effectAllowed = 'move';
+  });
+
+  card.addEventListener('dragend', function() {
+    draggedCard = null;
+  });
 
   var titleSpan = document.createElement('span');
   titleSpan.className = 'card-title';
@@ -76,6 +87,18 @@ function createColumnEl(name) {
   form.appendChild(errorEl);
 
   col.appendChild(form);
+
+  col.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  });
+
+  col.addEventListener('drop', function(e) {
+    e.preventDefault();
+    if (draggedCard) {
+      cardsList.appendChild(draggedCard);
+    }
+  });
 
   function addCard() {
     var title = sanitizeInput(input.value);
