@@ -73,6 +73,51 @@ function createColumnEl(name, savedCards) {
   header.textContent = name;
   col.appendChild(header);
 
+  header.addEventListener('dblclick', function() {
+    var currentName = header.textContent;
+
+    var renameInput = document.createElement('input');
+    renameInput.className = 'list-name-input';
+    renameInput.type = 'text';
+    renameInput.value = currentName;
+    renameInput.setAttribute('aria-label', 'List name');
+
+    header.style.display = 'none';
+    col.insertBefore(renameInput, header);
+    renameInput.focus();
+    renameInput.select();
+
+    var done = false;
+
+    function confirmRename() {
+      if (done) return;
+      done = true;
+      var newName = sanitizeInput(renameInput.value);
+      if (newName) {
+        var idx = COLUMNS.indexOf(currentName);
+        if (idx !== -1) COLUMNS[idx] = newName;
+        header.textContent = newName;
+        name = newName;
+      }
+      header.style.display = '';
+      renameInput.remove();
+    }
+
+    renameInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        confirmRename();
+      } else if (e.key === 'Escape') {
+        if (done) return;
+        done = true;
+        header.style.display = '';
+        renameInput.remove();
+      }
+    });
+
+    renameInput.addEventListener('blur', confirmRename);
+  });
+
   var cardsList = document.createElement('div');
   cardsList.className = 'cards-list';
   col.appendChild(cardsList);
