@@ -228,12 +228,59 @@ function createColumnEl(name, savedCards) {
   return col;
 }
 
+function createAddListForm() {
+  var form = makeEl('div', {className: 'add-list-form'});
+
+  var input = makeEl('input', {
+    className: 'add-list-input',
+    type: 'text',
+    placeholder: 'New list name…'
+  });
+  input.setAttribute('aria-label', 'New list name');
+  form.appendChild(input);
+
+  var button = makeEl('button', {
+    className: 'add-list-btn',
+    type: 'button',
+    textContent: 'Add list'
+  });
+  form.appendChild(button);
+
+  var errorEl = makeEl('div', {
+    className: 'error',
+    textContent: 'List name cannot be empty'
+  });
+  errorEl.setAttribute('role', 'alert');
+  form.appendChild(errorEl);
+
+  function addList() {
+    var name = sanitizeInput(input.value);
+    if (!name) {
+      errorEl.classList.add('visible');
+      return;
+    }
+    errorEl.classList.remove('visible');
+    COLUMNS.push(name);
+    board.insertBefore(createColumnEl(name, []), form);
+    input.value = '';
+    saveBoard();
+  }
+
+  button.addEventListener('click', addList);
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') addList();
+  });
+
+  return form;
+}
+
 var board = document.querySelector('.board-container');
 var savedState = loadBoard();
 COLUMNS.forEach(function(name) {
   var savedCards = savedState ? (savedState[name] || []) : [];
   board.appendChild(createColumnEl(name, savedCards));
 });
+board.appendChild(createAddListForm());
 
 // Global cleanup: clear draggedCard if mouse released outside any column.
 document.addEventListener('mouseup', function() {
