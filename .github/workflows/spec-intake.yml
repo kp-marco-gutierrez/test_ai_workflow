@@ -39,7 +39,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: gh issue comment ${{ github.event.issue.number }} -b "🚦 \`@generate-tests\` received — **Spec intake (AI1)** validating the spec and generating tests… ([run]($RUN_URL))"
+        run: bash scripts/retry.sh gh issue comment ${{ github.event.issue.number }} -b "🚦 \`@generate-tests\` received — **Spec intake (AI1)** validating the spec and generating tests… ([run]($RUN_URL))" || true
 
       - name: Spec intake (AI1)
         uses: anthropics/claude-code-action@v1
