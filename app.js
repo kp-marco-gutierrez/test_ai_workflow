@@ -1,225 +1,356 @@
 (function () {
+  var COLUMNS = ['To Do', 'Doing', 'Done'];
   var STORAGE_KEY = 'trello-lite-board';
+  var SELECTOR_COLUMN = '.column';
+  var SELECTOR_CARD = '.card';
+  var SELECTOR_COLUMN_HEADER = '.column-header';
+  var SELECTOR_CARDS_LIST = '.cards-list';
+  var DRAG_MIME_TYPE = 'text/plain';
+  var MAX_CARD_TITLE_LENGTH = 50;
   var draggedCard = null;
 
+  function sanitizeInput(value) {
+    // Strip HTML/script tags as defence-in-depth. All user-supplied strings are
+    // written back via textContent (never innerHTML), so entity-encoding is not
+    // required and would corrupt display of characters like & or <.
+    return value.replace(/<[^>]*>?/gm, '').trim();
+  }
+
+  // Utility: create an element and assign own properties in one call.
   function makeEl(tag, props) {
     var el = document.createElement(tag);
-    if (props) for (var k in props) el[k] = props[k];
+    for (var k in props) el[k] = props[k];
     return el;
   }
 
-  function saveBoard() {
-    var state = [];
-    document.querySelectorAll('.column').forEach(function (col) {
-      var hdr = col.querySelector('.column-header');
-      if (!hdr) return;
-      var cards = [];
-      col.querySelectorAll('.card-title').forEach(function (t) {
-        cards.push(t.textContent);
-      });
-      state.push({ name: hdr.textContent, cards: cards });
+  // Wire keyboard and blur handlers for an inline rename <input>.
+  //   onConfirm(newValue) – called on Enter; return false to abort (keep input open).
+  //   onCancel()          – called on Escape or blur when blurAction is 'cancel'.
+  //   blurAction          – 'confirm' | 'cancel'
+  //
+  // done is set to true *before* calling onConfirm so that removing the input
+  // element inside onConfirm (which synchronously fires blur) does not trigger
+  // a reentrant onCancel call. If onConfirm returns false the flag is reset.
+  function attachRenameHandlers(input, onConfirm, onCancel, blurAction) {
+    var done = false;
+
+    function doConfirm() {
+      if (done) return;
+      done = true;
+      var result = onConfirm(sanitizeInput(input.value));
+      if (result === false) done = false; // validation failed – re-arm
+    }
+
+    function doCancel() {
+      if (done) return;
+      done = true;
+      onCancel();
+    }
+
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); doConfirm(); }
+      else if (e.key === 'Escape') { doCancel(); }
     });
+
+    input.addEventListener('blur', blurAction === 'confirm' ? doConfirm : doCancel);
+  }
+
+  function saveBoard() {
+    var state = {};
+    COLUMNS.forEach(function(name) { state[name] = []; });
+    document.querySelectorAll(SELECTOR_COLUMN).forEach(function(col) {
+      var header = col.querySelector(SELECTOR_COLUMN_HEADER);
+      if (!header) return;
+      var colName = header.textContent;
+      col.querySelectorAll(SELECTOR_CARD).forEach(function(card) {
+        var titleEl = card.querySelector('.card-title');
+        if (titleEl) state[colName].push(titleEl.textContent);
+      });
+    });
+    state._columns = COLUMNS.slice();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
   function loadBoard() {
     try {
-      var s = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-      if (Array.isArray(s)) return s;
-    } catch (e) {}
+      var saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Failed to load saved board state:', e);
+      return { _corrupt: true };
+    }
     return null;
   }
 
-  function findColumnEl(name) {
-    var found = null;
-    document.querySelectorAll('.column').forEach(function (col) {
-      var h = col.querySelector('.column-header');
-      if (h && h.textContent === name) found = col;
-    });
-    return found;
+  // Shared handler for both HTML5 drop and mouse-based drop fallback.
+  function handleCardDrop(cardsList, name) {
+    if (!draggedCard) return;
+    cardsList.appendChild(draggedCard);
+    var sel = draggedCard.querySelector('select');
+    if (sel) sel.value = name;
+    draggedCard = null;
+    saveBoard();
   }
 
-  function buildSelectOptions(sel, currentColName) {
-    sel.innerHTML = '';
-    document.querySelectorAll('.column .column-header').forEach(function (h) {
-      var opt = makeEl('option', { value: h.textContent, textContent: h.textContent });
-      if (h.textContent === currentColName) opt.selected = true;
-      sel.appendChild(opt);
-    });
-  }
+  function createCardEl(title, currentColumn) {
+    var card = makeEl('div', {className: 'card', draggable: true});
 
-  function createCardEl(title, colName) {
-    var card = makeEl('div', { className: 'card', draggable: true });
-
-    card.addEventListener('dragstart', function (e) {
+    // dragend is the safety-net for HTML5 drag that ends without a drop target.
+    card.addEventListener('dragstart', function(e) {
       draggedCard = card;
       e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', title);
+      e.dataTransfer.setData(DRAG_MIME_TYPE, title);
     });
-    card.addEventListener('dragend', function () { draggedCard = null; });
-    card.addEventListener('mousedown', function () { draggedCard = card; });
 
-    card.appendChild(makeEl('span', { className: 'card-title', textContent: title }));
+    card.addEventListener('dragend', function() {
+      draggedCard = null;
+    });
 
-    var sel = makeEl('select');
-    sel.setAttribute('aria-label', 'Move to column');
-    sel.addEventListener('mousedown', function (e) { e.stopPropagation(); });
-    sel.addEventListener('change', function () {
-      var target = findColumnEl(sel.value);
-      if (target) {
-        target.querySelector('.cards-list').appendChild(card);
-        saveBoard();
+    // Mouse-based drag fallback for environments where HTML5 dragstart
+    // is not reliably triggered (e.g. Playwright's CDP simulation).
+    // The global mouseup listener is the safety-net for mouse drags that
+    // end outside any column's mouseup handler.
+    card.addEventListener('mousedown', function() {
+      draggedCard = card;
+    });
+
+    var titleSpan = makeEl('span', {className: 'card-title', textContent: title});
+    card.appendChild(titleSpan);
+
+    titleSpan.addEventListener('dblclick', function() {
+      var currentTitle = titleSpan.textContent;
+
+      var editInput = makeEl('input', {
+        className: 'card-edit',
+        type: 'text',
+        value: currentTitle
+      });
+      editInput.setAttribute('aria-label', 'Card title');
+
+      titleSpan.style.display = 'none';
+      card.insertBefore(editInput, titleSpan);
+      editInput.focus();
+      editInput.select();
+
+      function restoreTitle() {
+        titleSpan.style.display = '';
+        editInput.remove();
+      }
+
+      attachRenameHandlers(
+        editInput,
+        function(newTitle) {
+          if (newTitle) {
+            titleSpan.textContent = newTitle;
+            title = newTitle;
+          }
+          restoreTitle();
+          saveBoard();
+        },
+        restoreTitle,
+        'confirm'
+      );
+    });
+
+    var select = makeEl('select');
+    select.setAttribute('aria-label', 'Move to column');
+    COLUMNS.forEach(function(col) {
+      var option = makeEl('option', {value: col, textContent: col});
+      if (col === currentColumn) option.selected = true;
+      select.appendChild(option);
+    });
+
+    // Prevent the select's mousedown from setting draggedCard (the card's
+    // mousedown listener fires on bubble; stopPropagation blocks that).
+    select.addEventListener('mousedown', function(e) {
+      e.stopPropagation();
+    });
+
+    select.addEventListener('change', function() {
+      var targetName = select.value;
+      var columns = document.querySelectorAll(SELECTOR_COLUMN);
+      for (var i = 0; i < columns.length; i++) {
+        var header = columns[i].querySelector(SELECTOR_COLUMN_HEADER);
+        if (header && header.textContent === targetName) {
+          columns[i].querySelector(SELECTOR_CARDS_LIST).appendChild(card);
+          saveBoard();
+          break;
+        }
       }
     });
-    card.appendChild(sel);
 
-    // Populate options once card is in the DOM (deferred to next tick so all
-    // columns exist when loading saved state).
-    setTimeout(function () { buildSelectOptions(sel, colName); }, 0);
-
+    card.appendChild(select);
     return card;
   }
 
-  function startRename(col, header) {
-    var oldName = header.textContent;
-    var input = makeEl('input', { className: 'list-name-input', type: 'text', value: oldName });
-    input.setAttribute('aria-label', 'List name');
-
-    header.style.display = 'none';
-    header.parentNode.insertBefore(input, header);
-    input.focus();
-    input.select();
-
-    var done = false;
-
-    function commit() {
-      if (done) return;
-      done = true;
-      input.remove();
-      header.style.display = '';
-      var newName = input.value.trim();
-      if (!newName) return;
-      header.textContent = newName;
-      saveBoard();
-    }
-
-    function cancel() {
-      if (done) return;
-      done = true;
-      input.remove();
-      header.style.display = '';
-    }
-
-    input.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') commit();
-      else if (e.key === 'Escape') cancel();
-    });
-    input.addEventListener('blur', commit);
-  }
-
   function createColumnEl(name, savedCards) {
-    var col = makeEl('div', { className: 'column' });
+    var col = makeEl('div', {className: 'column'});
 
-    var headerRow = makeEl('div', { className: 'column-header-row' });
-    var header = makeEl('h2', { className: 'column-header', textContent: name });
+    var header = makeEl('h2', {className: 'column-header', textContent: name});
+    col.appendChild(header);
 
-    var renameBtn = makeEl('button', { className: 'rename-list', type: 'button', textContent: '✎' });
-    renameBtn.setAttribute('aria-label', 'Rename list');
+    header.addEventListener('dblclick', function() {
+      var currentName = header.textContent;
 
-    var deleteBtn = makeEl('button', { className: 'delete-list', type: 'button', textContent: '✕' });
-    deleteBtn.setAttribute('aria-label', 'Delete list');
+      // CSS class list-name-input is intentional: tests locate this input by that selector.
+      var renameInput = makeEl('input', {
+        className: 'list-name-input',
+        type: 'text',
+        value: currentName
+      });
+      renameInput.setAttribute('aria-label', 'List name');
 
-    headerRow.appendChild(header);
-    headerRow.appendChild(renameBtn);
-    headerRow.appendChild(deleteBtn);
-    col.appendChild(headerRow);
+      var renameError = makeEl('div', {
+        className: 'error',
+        textContent: 'A column with that name already exists'
+      });
+      renameError.setAttribute('role', 'alert');
 
-    header.addEventListener('dblclick', function () { startRename(col, header); });
-    renameBtn.addEventListener('click', function () { startRename(col, header); });
-    deleteBtn.addEventListener('click', function () {
-      col.remove();
-      saveBoard();
+      header.style.display = 'none';
+      col.insertBefore(renameInput, header);
+      col.insertBefore(renameError, header);
+      renameInput.focus();
+      renameInput.select();
+
+      renameInput.addEventListener('input', function() {
+        renameError.classList.remove('visible');
+      });
+
+      function cleanup() {
+        header.style.display = '';
+        renameError.classList.remove('visible');
+        renameInput.remove();
+        renameError.remove();
+      }
+
+      attachRenameHandlers(
+        renameInput,
+        function(newName) {
+          var isDuplicate = newName !== currentName && COLUMNS.indexOf(newName) !== -1;
+          if (isDuplicate) {
+            renameError.classList.add('visible');
+            renameInput.select();
+            return false;
+          }
+          renameError.classList.remove('visible');
+          if (newName && newName !== currentName) {
+            var idx = COLUMNS.indexOf(currentName);
+            if (idx !== -1) COLUMNS[idx] = newName;
+            header.textContent = newName;
+            name = newName;
+          }
+          cleanup();
+          saveBoard();
+        },
+        cleanup,
+        'cancel'
+      );
     });
 
-    var cardsList = makeEl('div', { className: 'cards-list' });
-
-    col.addEventListener('dragover', function (e) {
+    col.addEventListener('dragover', function(e) {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
     });
 
-    col.addEventListener('drop', function (e) {
+    col.addEventListener('drop', function(e) {
       e.preventDefault();
-      if (draggedCard) {
-        cardsList.appendChild(draggedCard);
-        var s = draggedCard.querySelector('select');
-        if (s) s.value = name;
-        draggedCard = null;
-        saveBoard();
-      }
+      handleCardDrop(cardsList, name);
     });
 
-    col.addEventListener('mouseup', function () {
-      if (draggedCard && draggedCard.closest('.column') !== col) {
-        cardsList.appendChild(draggedCard);
-        var s = draggedCard.querySelector('select');
-        if (s) s.value = name;
-        draggedCard = null;
-        saveBoard();
+    // Mouse-based drop: handles drag_to() when HTML5 dragstart doesn't fire.
+    col.addEventListener('mouseup', function() {
+      if (!draggedCard) return;
+      var sourceCol = draggedCard.closest(SELECTOR_COLUMN);
+      if (sourceCol !== col) {
+        handleCardDrop(cardsList, name);
       }
+      draggedCard = null;
     });
 
+    var cardsList = makeEl('div', {className: 'cards-list'});
     col.appendChild(cardsList);
 
-    (savedCards || []).forEach(function (t) {
-      cardsList.appendChild(createCardEl(t, name));
+    if (savedCards) {
+      savedCards.forEach(function(title) {
+        cardsList.appendChild(createCardEl(title, name));
+      });
+    }
+
+    var form = makeEl('div', {className: 'add-card-form'});
+
+    var input = makeEl('input', {
+      className: 'card-input',
+      type: 'text',
+      placeholder: 'Card title…'
     });
+    input.setAttribute('aria-label', 'Card title');
+    form.appendChild(input);
 
-    var form = makeEl('div', { className: 'add-card-form' });
-    var cardInput = makeEl('input', { className: 'card-input', type: 'text', placeholder: 'Card title…' });
-    cardInput.setAttribute('aria-label', 'Card title');
-    var addBtn = makeEl('button', { className: 'add-card', type: 'button', textContent: 'Add card' });
-    var errEl = makeEl('div', { className: 'error', textContent: 'Card title cannot be empty' });
-    errEl.setAttribute('role', 'alert');
+    var button = makeEl('button', {
+      className: 'add-card',
+      type: 'button',
+      textContent: 'Add card'
+    });
+    form.appendChild(button);
 
-    form.appendChild(cardInput);
-    form.appendChild(addBtn);
-    form.appendChild(errEl);
+    var errorEl = makeEl('div', {
+      className: 'error',
+      textContent: 'Card title cannot be empty'
+    });
+    errorEl.setAttribute('role', 'alert');
+    form.appendChild(errorEl);
+
     col.appendChild(form);
 
     function addCard() {
-      var t = cardInput.value.trim();
-      if (!t) { errEl.classList.add('visible'); return; }
-      errEl.classList.remove('visible');
-      cardsList.appendChild(createCardEl(t, name));
-      cardInput.value = '';
+      var title = sanitizeInput(input.value);
+      if (!title) {
+        errorEl.textContent = 'Card title cannot be empty';
+        errorEl.classList.add('visible');
+        return;
+      }
+      if (title.length > MAX_CARD_TITLE_LENGTH) {
+        errorEl.textContent = 'Card title cannot exceed ' + MAX_CARD_TITLE_LENGTH + ' characters';
+        errorEl.classList.add('visible');
+        return;
+      }
+      errorEl.classList.remove('visible');
+      cardsList.appendChild(createCardEl(title, name));
+      input.value = '';
       saveBoard();
     }
 
-    addBtn.addEventListener('click', addCard);
-    cardInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') addCard(); });
+    button.addEventListener('click', addCard);
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') addCard();
+    });
+    input.addEventListener('input', function() {
+      errorEl.classList.remove('visible');
+    });
 
     return col;
   }
 
-  function init() {
-    var board = document.querySelector('.board-container');
-    var saved = loadBoard();
-    var initial = saved || [
-      { name: 'To Do', cards: [] },
-      { name: 'Doing', cards: [] },
-      { name: 'Done', cards: [] }
-    ];
-    initial.forEach(function (colData) {
-      board.appendChild(createColumnEl(colData.name, colData.cards));
+  var board = document.querySelector('.board-container');
+  var savedState = loadBoard();
+  if (savedState && savedState._corrupt) {
+    var loadErrorEl = makeEl('p', {
+      className: 'load-error',
+      textContent: 'Your saved board could not be loaded. Starting with a fresh board.'
     });
+    board.parentNode.insertBefore(loadErrorEl, board);
+    savedState = null;
   }
-
-  document.addEventListener('mouseup', function () { draggedCard = null; });
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
+  if (savedState && Array.isArray(savedState._columns) && savedState._columns.length) {
+    COLUMNS = savedState._columns.slice();
   }
-}());
+  COLUMNS.forEach(function(name) {
+    var savedCards = savedState ? (savedState[name] || []) : [];
+    board.appendChild(createColumnEl(name, savedCards));
+  });
+
+  // Global cleanup: clear draggedCard if mouse released outside any column.
+  document.addEventListener('mouseup', function() {
+    draggedCard = null;
+  });
+})();
