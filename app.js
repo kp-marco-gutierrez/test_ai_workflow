@@ -2,7 +2,11 @@ const COLUMNS = ['To Do', 'Doing', 'Done'];
 const STORAGE_KEY = 'trello-lite-board';
 
 function sanitizeInput(value) {
-  return value.trim().replace(/<[^>]*>/g, '');
+  return value
+    .trim()
+    .replace(/<[^>]*>/g, '')                                     // strip HTML tags
+    .replace(/&#?\w+;/gi, '')                                    // strip HTML entities
+    .replace(/on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, ''); // strip event handler attrs
 }
 
 function saveBoard() {
@@ -24,7 +28,9 @@ function loadBoard() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) return JSON.parse(saved);
-  } catch (e) {}
+  } catch (e) {
+    console.error('Failed to load board state:', e);
+  }
   return null;
 }
 
