@@ -100,7 +100,7 @@ jobs:
           if [ "${{ steps.run.outputs.passed }}" = "true" ]; then
             gh pr comment "$pr" -b "🧪 **Tests** passed (deterministic gate) → proceeding to code review. ([run]($RUN_URL))"
           else
-            gh pr comment "$pr" -b "🧪 **Tests** failing as expected (no/incomplete implementation) → Claude will implement. ([run]($RUN_URL))"
+            gh pr comment "$pr" -b "🧪 **Tests** failing as expected → next: AI-Red-Team checks the tests against the spec, then Claude implements. ([run]($RUN_URL))"
           fi
 
       - name: Upload test output
@@ -111,10 +111,96 @@ jobs:
           path: test-output.txt
           retention-days: 3
 
+  test-qa:
+    name: AI-Red-Team review (tests vs spec)
+    needs: tests
+    # Only while authoring tests (tests still failing) and not yet approved.
+    if: needs.tests.outputs.passed == 'false' && !contains(github.event.pull_request.labels.*.name, 'tests-reviewed')
+    runs-on: ubuntu-latest
+    outputs:
+      verdict: ${{ steps.tr.outputs.verdict }}
+      review: ${{ steps.tr.outputs.review }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Comment — test review started
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: gh pr comment ${{ github.event.pull_request.number }} -b "🔴 **Test QA** — ChatGPT is checking the tests against the spec… ([run]($RUN_URL))"
+      - name: ChatGPT reviews tests vs spec
+        id: tr
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-4o' }}
+        run: |
+          verdict="$(python3 scripts/chatgpt_review.py --mode tests)"
+          echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+          { echo "review<<RV_EOF"; cat review.md; echo "RV_EOF"; } >> "$GITHUB_OUTPUT"
+      - name: Post test review
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr comment ${{ github.event.pull_request.number }} --body-file review.md
+      - name: Mark tests reviewed (on approve)
+        if: steps.tr.outputs.verdict == 'APPROVE'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr edit ${{ github.event.pull_request.number }} --add-label tests-reviewed
+          gh pr comment ${{ github.event.pull_request.number }} -b "🔴 **Test QA** verdict: ✅ tests match the spec → Claude will implement."
+      - name: Note request-changes
+        if: steps.tr.outputs.verdict == 'REQUEST_CHANGES'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr comment ${{ github.event.pull_request.number }} -b "🔴 **Test QA** verdict: 📝 tests need changes → Claude will revise the tests."
+
+  fix-tests:
+    name: Claude revises the tests (AI1)
+    needs: [tests, test-qa]
+    if: needs.test-qa.outputs.verdict == 'REQUEST_CHANGES'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - name: Comment — fixing tests
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: gh pr comment ${{ github.event.pull_request.number }} -b "✍️ **Revise tests** — Claude (AI1) is addressing the test review… ([run]($RUN_URL))"
+      - name: Claude edits the tests
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_bots: "*"
+          claude_args: '--allowed-tools "Read,Write,Edit,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(python3:*)"'
+          prompt: |
+            You are AI1 on PR #${{ github.event.pull_request.number }}. The
+            AI-Red-Team (ChatGPT) reviewed the generated tests against the spec
+            and requested changes:
+
+            ${{ needs.test-qa.outputs.review }}
+
+            Address the valid points by editing the TESTS and/or the .feature
+            spec only. Write NO implementation code — the tests must still FAIL
+            the dry run. Do not skip/xfail. Run
+            `python3 scripts/validate_spec.py features/`, then commit to this PR
+            branch (${{ github.event.pull_request.head.ref }}) and push.
+
   develop:
     name: Claude develops (until tests pass)
-    needs: tests
-    if: needs.tests.outputs.passed == 'false'
+    needs: [tests, test-qa]
+    # Implement only once the tests have been reviewed (label present from a
+    # prior round) or were just approved in this run.
+    if: |
+      always() &&
+      needs.tests.result == 'success' &&
+      needs.tests.outputs.passed == 'false' &&
+      (contains(github.event.pull_request.labels.*.name, 'tests-reviewed') || needs.test-qa.outputs.verdict == 'APPROVE')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
