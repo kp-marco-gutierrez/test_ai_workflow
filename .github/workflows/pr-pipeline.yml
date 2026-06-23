@@ -267,4 +267,15 @@ jobs:
       - name: Squash merge
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh pr merge ${{ github.event.pull_request.number }} --squash --delete-branch
+        run: |
+          pr=${{ github.event.pull_request.number }}
+          if [ "$(gh pr view "$pr" --json state -q .state)" = "MERGED" ]; then
+            echo "PR already merged."; exit 0
+          fi
+          gh pr merge "$pr" --squash
+          # Delete the head branch via the API. We avoid `gh pr merge
+          # --delete-branch` because its local git cleanup fails in CI (the
+          # checkout has no local `main`): "origin/main is not a commit".
+          gh api -X DELETE \
+            "repos/${{ github.repository }}/git/refs/heads/${{ github.event.pull_request.head.ref }}" \
+            || echo "branch already deleted"
