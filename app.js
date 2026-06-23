@@ -10,26 +10,32 @@
     listEmpty: 'List name cannot be empty',
     listDuplicate: 'A list with that name already exists',
     saveFailed: 'Could not save board — storage unavailable',
+    saveFailedQuota: 'Could not save board — storage quota exceeded',
     loadFailed: 'Could not restore saved board — storage unavailable',
   };
 
   // Belt-and-suspenders: strip HTML-meaningful characters so stored/displayed
   // values are never interpreted as markup. All DOM insertion uses textContent
   // (never innerHTML), which already prevents XSS at the insertion point.
+  // Values consisting entirely of whitespace are rejected via the empty check
+  // after trimming so users receive a clear error rather than silent rejection.
   function sanitizeInput(value) {
     return value.trim().replace(/[<>&"]/g, '');
   }
 
-  function makeEl(tag, props) {
+  // Creates an element, sets own properties, and optionally sets HTML
+  // attributes (e.g. aria-* or role) via setAttribute to avoid repetition.
+  function makeEl(tag, props, attrs) {
     var el = document.createElement(tag);
     for (var k in props) el[k] = props[k];
+    if (attrs) {
+      for (var a in attrs) el.setAttribute(a, attrs[a]);
+    }
     return el;
   }
 
   function makeErrorEl(message) {
-    var el = makeEl('div', { className: 'error', textContent: message });
-    el.setAttribute('role', 'alert');
-    return el;
+    return makeEl('div', { className: 'error', textContent: message }, { role: 'alert' });
   }
 
   // Returns live h2.column-header elements — used for case-insensitive
@@ -42,8 +48,7 @@
 
   function showStorageError(msg) {
     if (!_storageNotice) {
-      _storageNotice = makeEl('div', { className: 'storage-notice', textContent: msg });
-      _storageNotice.setAttribute('role', 'alert');
+      _storageNotice = makeEl('div', { className: 'storage-notice', textContent: msg }, { role: 'alert' });
       var boardContainer = document.querySelector('.board-container');
       document.body.insertBefore(_storageNotice, boardContainer);
     } else {
@@ -70,7 +75,15 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (e) {
       console.error('Failed to save board:', e);
-      showStorageError(MESSAGES.saveFailed);
+      // Distinguish quota exhaustion from other storage failures so the
+      // message gives users a meaningful hint about the cause.
+      var isQuota = e instanceof DOMException && (
+        e.code === 22 ||
+        e.code === 1014 ||
+        e.name === 'QuotaExceededError' ||
+        e.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+      );
+      showStorageError(isQuota ? MESSAGES.saveFailedQuota : MESSAGES.saveFailed);
     }
   }
 
@@ -116,8 +129,7 @@
     var titleSpan = makeEl('span', { className: 'card-title', textContent: title });
     card.appendChild(titleSpan);
 
-    var select = makeEl('select');
-    select.setAttribute('aria-label', 'Move to column');
+    var select = makeEl('select', {}, { 'aria-label': 'Move to column' });
     COLUMNS.forEach(function (col) {
       var option = makeEl('option', { value: col, textContent: col });
       if (col === currentColumn) option.selected = true;
@@ -157,19 +169,18 @@
         className: 'list-name-input',
         type: 'text',
         value: currentName,
-      });
-      renameInput.setAttribute('aria-label', 'List name');
+      }, { 'aria-label': 'List name' });
 
       header.style.display = 'none';
       col.insertBefore(renameInput, header);
       renameInput.focus();
       renameInput.select();
 
-      var done = false;
+      var renameCompleted = false;
 
       function confirmRename() {
-        if (done) return;
-        done = true;
+        if (renameCompleted) return;
+        renameCompleted = true;
         var newName = sanitizeInput(renameInput.value);
         var newLower = newName.toLowerCase();
         var currentLower = currentName.toLowerCase();
@@ -194,8 +205,8 @@
           e.preventDefault();
           confirmRename();
         } else if (e.key === 'Escape') {
-          if (done) return;
-          done = true;
+          if (renameCompleted) return;
+          renameCompleted = true;
           header.style.display = '';
           renameInput.remove();
         }
@@ -239,8 +250,7 @@
       className: 'card-input',
       type: 'text',
       placeholder: 'Card title…',
-    });
-    input.setAttribute('aria-label', 'Card title');
+    }, { 'aria-label': 'Card title' });
     form.appendChild(input);
 
     var button = makeEl('button', {
@@ -282,8 +292,7 @@
       className: 'add-list-input',
       type: 'text',
       placeholder: 'New list name…',
-    });
-    input.setAttribute('aria-label', 'New list name');
+    }, { 'aria-label': 'New list name' });
     form.appendChild(input);
 
     var button = makeEl('button', {
@@ -327,6 +336,8 @@
     return form;
   }
 
+  // Columns are appended by iterating COLUMNS in order, which enforces the
+  // "To Do", "Doing", "Done" display order required by the board layout spec.
   var board = document.querySelector('.board-container');
   var savedState = loadBoard();
   COLUMNS.forEach(function (name) {
