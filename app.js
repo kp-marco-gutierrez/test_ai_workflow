@@ -1,5 +1,6 @@
 var COLUMNS = ['To Do', 'Doing', 'Done'];
 var STORAGE_KEY = 'trello-lite-board';
+var draggedCard = null;
 
 function sanitizeInput(value) {
   return value.trim();
@@ -31,6 +32,17 @@ function loadBoard() {
 function createCardEl(title, currentColumn) {
   var card = document.createElement('div');
   card.className = 'card';
+  card.draggable = true;
+
+  card.addEventListener('dragstart', function(e) {
+    draggedCard = card;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', '');
+  });
+
+  card.addEventListener('dragend', function() {
+    draggedCard = null;
+  });
 
   var titleSpan = document.createElement('span');
   titleSpan.className = 'card-title';
@@ -116,6 +128,21 @@ function createColumnEl(name, savedCards) {
     });
 
     renameInput.addEventListener('blur', confirmRename);
+  });
+
+  col.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  });
+
+  col.addEventListener('drop', function(e) {
+    e.preventDefault();
+    if (draggedCard) {
+      cardsList.appendChild(draggedCard);
+      var sel = draggedCard.querySelector('select');
+      if (sel) sel.value = name;
+      saveBoard();
+    }
   });
 
   var cardsList = document.createElement('div');
