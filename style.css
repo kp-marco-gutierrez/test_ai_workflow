@@ -53,8 +53,8 @@ button.add-card {
 }
 button.add-card:hover { background: rgba(255,255,255,.4); }
 .error {
-  background: #ffebe8;
-  color: #ae2a19;
+  background: #fef2f2;
+  color: #991b1b;
   border-radius: 4px;
   padding: 6px 8px;
   font-size: 0.8rem;
