@@ -1,0 +1,223 @@
+name: PR Pipeline (test QA -> implement -> verify -> code review)
+
+# Drives the AI-only pipeline on the AI1 test PR (label `ai-tests`), all chained
+# as sequential jobs in ONE run so no PAT is needed (a label added by the
+# default token would not trigger a separate workflow).
+#
+#   dry-run    (step 4) tests MUST fail against the unimplemented codebase
+#   review     (step 3) ChatGPT (AI-Red-Team) critiques tests vs spec, comments
+#   address            if REQUEST_CHANGES: Claude fixes the tests (loops)
+#   implement  (step 5) if APPROVE: relabel, then AI2 (Claude) writes code until
+#                       the tests pass and pushes to the PR branch
+#   verify     (step 6) re-run the tests; MUST pass -> mark PR ready, request review
+#   code-review(step 8) ChatGPT reviews the implementation as a code reviewer
+#
+# Stack-agnostic: cucumber-js if package.json exists, else pytest.
+
+on:
+  pull_request:
+    types: [labeled, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  dry-run:
+    name: Dry run (tests MUST fail)
+    if: contains(github.event.pull_request.labels.*.name, 'ai-tests')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Run tests and require failure
+        run: |
+          set +e
+          if [ -f package.json ]; then
+            npm ci || npm install
+            npx --yes playwright install --with-deps chromium || true
+            npx cucumber-js
+          else
+            pip install -r requirements.txt
+            pytest -q
+          fi
+          code=$?
+          set -e
+          if [ "$code" -eq 0 ]; then
+            echo "::error::Tests PASSED against an unimplemented codebase — they are auto-passing. Dry-run gate FAILED."
+            exit 1
+          fi
+          echo "Tests failed as required (exit $code). Dry-run gate passed."
+
+  review:
+    name: AI-Red-Team review (ChatGPT)
+    needs: dry-run
+    runs-on: ubuntu-latest
+    outputs:
+      verdict: ${{ steps.review.outputs.verdict }}
+      review: ${{ steps.review.outputs.review }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Review tests against the spec
+        id: review
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-4o' }}
+        run: |
+          verdict="$(python3 scripts/chatgpt_review.py --mode tests)"
+          echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+          {
+            echo "review<<REVIEW_EOF"
+            cat review.md
+            echo "REVIEW_EOF"
+          } >> "$GITHUB_OUTPUT"
+      - name: Post review comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr comment ${{ github.event.pull_request.number }} --body-file review.md
+
+  address:
+    name: Claude addresses the test review
+    needs: review
+    if: needs.review.outputs.verdict == 'REQUEST_CHANGES'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - name: Claude edits the tests
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: '--allowed-tools "Read,Write,Edit,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(python3:*)"'
+          prompt: |
+            AI-Red-Team (ChatGPT) reviewed the generated tests against the BDD
+            spec on PR #${{ github.event.pull_request.number }} and requested
+            changes:
+
+            ${{ needs.review.outputs.review }}
+
+            Address the VALID points by editing ONLY the test files (touch a
+            .feature only for a genuine spec/test mismatch). Do NOT write
+            implementation code — the tests must still FAIL the dry run. Do not
+            skip/xfail or weaken assertions to pass. Then run
+            `python3 scripts/validate_spec.py features/`, commit to this PR
+            branch (${{ github.event.pull_request.head.ref }}), and reply with a
+            short summary of what you changed.
+
+  implement:
+    name: AI2 implements until tests pass
+    needs: review
+    if: needs.review.outputs.verdict == 'APPROVE'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - name: Enter implementation phase (relabel)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr edit ${{ github.event.pull_request.number }} \
+            --add-label tests-approved --remove-label ai-tests
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install test deps
+        run: |
+          if [ -f package.json ]; then
+            npm ci || npm install
+            npx --yes playwright install --with-deps chromium || true
+          else
+            pip install -r requirements.txt
+          fi
+      - name: AI2 writes the implementation
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: '--allowed-tools "Read,Write,Edit,Glob,Grep,Bash"'
+          prompt: |
+            You are AI2 (the implementer) in an automated BDD pipeline, on PR
+            #${{ github.event.pull_request.number }}. The BDD tests in this PR
+            were approved by AI-Red-Team. Write the IMPLEMENTATION so the tests
+            pass.
+
+            - Run the test suite (cucumber-js if package.json exists, else
+              pytest -q). Implement the minimal, clean code to satisfy the
+              failing tests, then re-run and iterate until ALL tests pass.
+            - Do NOT modify the tests or the .feature spec — make the code meet
+              the tests, not the other way around.
+            - This is a static GitHub Pages app: the entry point is index.html
+              at the repo root; keep it pure client-side (no backend, no build
+              step) with relative asset paths only.
+            - Commit your implementation to this PR branch
+              (${{ github.event.pull_request.head.ref }}) and push.
+
+  verify:
+    name: Verify (tests MUST pass)
+    needs: implement
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Run tests (must pass)
+        run: |
+          if [ -f package.json ]; then
+            npm ci || npm install
+            npx --yes playwright install --with-deps chromium || true
+            npx cucumber-js
+          else
+            pip install -r requirements.txt
+            pytest -q
+          fi
+      - name: Mark ready and request code review
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr ready ${{ github.event.pull_request.number }}
+          gh pr edit ${{ github.event.pull_request.number }} --add-label needs-code-review
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "✅ Implementation passes the BDD tests (step 6 verify). PR marked ready; running code review."
+
+  code-review:
+    name: Code review (ChatGPT)
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: ChatGPT reviews the implementation
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-4o' }}
+        run: python3 scripts/chatgpt_review.py --mode code
+      - name: Post code review comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr comment ${{ github.event.pull_request.number }} --body-file review.md

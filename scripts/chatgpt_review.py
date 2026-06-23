@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-"""AI-Red-Team test review (step 3 of the AI-only pipeline).
+"""AI reviewer (ChatGPT) for the AI-only pipeline.
 
-Uses the OpenAI API (ChatGPT) to critique the generated BDD tests against their
-.feature specs:
-  - coverage: every Scenario / Given-When-Then has a real, exercised test
-  - faithfulness: assertions match the exact Then outcomes
-  - no auto-pass: no truthy-constant asserts, missing assertions, skip/xfail, etc.
-  - no spec drift: tests don't invent behavior the spec doesn't state
+Two modes:
+
+  --mode tests  (default, step 3 — AI-Red-Team)
+      Critique the generated BDD tests against their .feature specs: coverage,
+      faithful assertions, auto-pass smells, spec drift.
+
+  --mode code   (step 8 — code review)
+      Review the implementation that was written to satisfy the spec, with a
+      senior code-reviewer hat: correctness vs spec, DRY, architecture,
+      security, readability/maintainability.
 
 Writes the review to review.md and prints the verdict (APPROVE or
 REQUEST_CHANGES) to stdout so the workflow can branch on it.
@@ -16,7 +20,6 @@ Env:
   OPENAI_MODEL    (default: gpt-4o)
 """
 
-import glob
 import json
 import os
 import sys
@@ -34,14 +37,24 @@ TEST_GLOBS = [
     "features/step_definitions/**/*.js",
     "features/step_definitions/**/*.ts",
 ]
+CODE_EXTS = (".py", ".js", ".ts", ".html", ".css")
+PRUNE_DIRS = {"tests", "features", "scripts", "node_modules", ".git", ".github"}
 
-SYSTEM = (
-    "You are AI-Red-Team, a meticulous adversarial test reviewer in an automated "
-    "BDD pipeline. You review generated tests against their Gherkin specs. You do "
-    "NOT review or write implementation code."
-)
+SYSTEM = {
+    "tests": (
+        "You are AI-Red-Team, a meticulous adversarial test reviewer in an "
+        "automated BDD pipeline. You review generated tests against their "
+        "Gherkin specs. You do NOT review or write implementation code."
+    ),
+    "code": (
+        "You are a senior code reviewer in an automated BDD pipeline. You review "
+        "the implementation that was written to satisfy a Gherkin spec and its "
+        "tests."
+    ),
+}
 
-INSTRUCTIONS = """\
+INSTRUCTIONS = {
+    "tests": """\
 Review the generated tests against the BDD spec(s). Be concrete and actionable —
 cite the file and the scenario for every point.
 
@@ -57,16 +70,50 @@ cite the file and the scenario for every point.
 End your response with a final line that is EXACTLY one of:
 VERDICT: APPROVE
 VERDICT: REQUEST_CHANGES
-"""
+""",
+    "code": """\
+Review the implementation against the spec and tests, as a senior reviewer. Be
+concrete and actionable — cite file and the relevant code for every point.
+
+1. Correctness — the code actually satisfies the spec's behavior (not just the
+   literal tests). Flag gaps or behavior the spec requires but code misses.
+2. DRY / simplicity — duplication, dead code, needless complexity.
+3. Architecture — sensible structure, separation, naming; for a static GitHub
+   Pages app: pure client-side, no backend, relative asset paths.
+4. Security — injection/XSS, unsafe DOM, secrets, unsafe defaults.
+5. Readability / maintainability.
+
+End your response with a final line that is EXACTLY one of:
+VERDICT: APPROVE
+VERDICT: REQUEST_CHANGES
+""",
+}
 
 
-def collect(globs):
+def read(path):
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        return fh.read()
+
+
+def collect_glob(globs):
+    import glob
+
     out = {}
     for g in globs:
         for p in glob.glob(g, recursive=True):
             if os.path.isfile(p):
-                with open(p, encoding="utf-8") as fh:
-                    out[p] = fh.read()
+                out[p] = read(p)
+    return out
+
+
+def collect_code():
+    out = {}
+    for root, dirs, files in os.walk("."):
+        dirs[:] = [d for d in dirs if d not in PRUNE_DIRS]
+        for f in files:
+            if f.endswith(CODE_EXTS):
+                p = os.path.join(root, f)
+                out[p] = read(p)
     return out
 
 
@@ -78,36 +125,16 @@ def block(files):
     )
 
 
-def main():
-    if not API_KEY:
-        print("OPENAI_API_KEY is not set", file=sys.stderr)
-        return 2
-
-    specs = collect(SPEC_GLOBS)
-    tests = collect(TEST_GLOBS)
-
-    if not tests:
-        with open("review.md", "w", encoding="utf-8") as fh:
-            fh.write("## 🔴 AI-Red-Team review (ChatGPT)\n\n_No test files found to review._\n")
-        print("APPROVE")
-        return 0
-
-    user = (
-        f"## BDD spec(s)\n{block(specs)}\n\n"
-        f"## Generated tests\n{block(tests)}\n\n"
-        f"## Task\n{INSTRUCTIONS}"
-    )
-
+def call_openai(system, user):
     payload = json.dumps(
         {
             "model": MODEL,
             "messages": [
-                {"role": "system", "content": SYSTEM},
+                {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
         }
     ).encode()
-
     req = urllib.request.Request(
         "https://api.openai.com/v1/chat/completions",
         data=payload,
@@ -116,9 +143,49 @@ def main():
             "Content-Type": "application/json",
         },
     )
+    with urllib.request.urlopen(req, timeout=180) as resp:
+        data = json.load(resp)
+    return data["choices"][0]["message"]["content"].strip()
+
+
+def main(argv):
+    mode = "tests"
+    if "--mode" in argv:
+        mode = argv[argv.index("--mode") + 1]
+    if mode not in ("tests", "code"):
+        print(f"unknown mode: {mode}", file=sys.stderr)
+        return 2
+    if not API_KEY:
+        print("OPENAI_API_KEY is not set", file=sys.stderr)
+        return 2
+
+    specs = collect_glob(SPEC_GLOBS)
+    if mode == "tests":
+        subject = collect_glob(TEST_GLOBS)
+        subject_label = "Generated tests"
+        empty_msg = "No test files found to review."
+    else:
+        subject = collect_code()
+        subject_label = "Implementation"
+        empty_msg = "No implementation files found to review."
+
+    title = "🔴 AI-Red-Team review (ChatGPT)" if mode == "tests" else "🧐 Code review (ChatGPT)"
+
+    if not subject:
+        with open("review.md", "w", encoding="utf-8") as fh:
+            fh.write(f"## {title}\n\n_{empty_msg}_\n")
+        # No tests to review -> nothing to block on; no code -> needs changes.
+        print("APPROVE" if mode == "tests" else "REQUEST_CHANGES")
+        return 0
+
+    user = (
+        f"## BDD spec(s)\n{block(specs)}\n\n"
+        f"## {subject_label}\n{block(subject)}\n\n"
+        f"## Task\n{INSTRUCTIONS[mode]}"
+    )
+
     try:
-        with urllib.request.urlopen(req, timeout=180) as resp:
-            data = json.load(resp)
+        review = call_openai(SYSTEM[mode], user)
     except urllib.error.HTTPError as e:
         print(f"OpenAI API error {e.code}: {e.read().decode()}", file=sys.stderr)
         return 1
@@ -126,19 +193,16 @@ def main():
         print(f"OpenAI request failed: {e}", file=sys.stderr)
         return 1
 
-    review = data["choices"][0]["message"]["content"].strip()
     with open("review.md", "w", encoding="utf-8") as fh:
-        fh.write("## 🔴 AI-Red-Team review (ChatGPT)\n\n")
-        fh.write(review + "\n")
+        fh.write(f"## {title}\n\n{review}\n")
 
     up = review.upper()
     if "VERDICT: APPROVE" in up and "VERDICT: REQUEST_CHANGES" not in up:
         print("APPROVE")
     else:
-        # Default to REQUEST_CHANGES when unclear — fail safe toward scrutiny.
         print("REQUEST_CHANGES")
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))
