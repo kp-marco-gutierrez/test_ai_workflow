@@ -86,12 +86,23 @@ hard for anything that should be fixed before merge:
 - genuine quality problems: confusing or dead code, poor structure,
   duplication, unclear naming, missing error handling.
 
-If anything should be fixed, return `VERDICT: REQUEST_CHANGES` with specific,
-actionable points — Claude will fix them. Return `VERDICT: APPROVE` only when
-the code is correct, secure, and clean with nothing left worth fixing.
-**When in doubt, REQUEST_CHANGES** — do not wave issues through. Keep each point
-concrete (cite file + code), and don't re-raise something already addressed in
-a prior round.
+ACCURACY (critical — verify before you flag):
+- Every issue MUST be demonstrably present in the code shown. Quote the exact
+  line. Do NOT raise hypothetical or generic concerns.
+- Assigning user input via `textContent`, `createTextNode`, or element property
+  setters is XSS-SAFE — do NOT flag those as XSS. Only flag injection when raw
+  HTML is built (innerHTML / insertAdjacentHTML / document.write with untrusted
+  data).
+- If the code already handles something (e.g. input is already `.trim()`-ed),
+  do NOT raise it.
+- If "Prior review rounds" are shown below, do NOT re-raise any point the
+  current code already addresses — those are resolved.
+
+If a real, currently-present problem remains, return `VERDICT: REQUEST_CHANGES`
+with specific, actionable points — Claude will fix them. Return
+`VERDICT: APPROVE` only when the code is correct, secure, and clean with nothing
+genuinely left to fix. When in doubt about a REAL defect, REQUEST_CHANGES; but
+do not invent or re-raise issues just to have something to say.
 
 End your response with a final line that is EXACTLY one of:
 VERDICT: APPROVE
@@ -188,9 +199,22 @@ def main(argv):
         print("APPROVE" if mode == "tests" else "REQUEST_CHANGES")
         return 0
 
+    prior = ""
+    if mode == "code":
+        pf = os.environ.get("PRIOR_REVIEWS_FILE", "prior-reviews.md")
+        if os.path.isfile(pf):
+            txt = read(pf).strip()
+            if txt:
+                prior = (
+                    "## Prior review rounds (already raised — do NOT re-raise any "
+                    "point the current code now addresses)\n"
+                    f"{txt}\n\n"
+                )
+
     user = (
         f"## BDD spec(s)\n{block(specs)}\n\n"
         f"## {subject_label}\n{block(subject)}\n\n"
+        f"{prior}"
         f"## Task\n{INSTRUCTIONS[mode]}"
     )
 
