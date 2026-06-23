@@ -37,6 +37,48 @@ function createCardEl(title, currentColumn) {
   titleSpan.textContent = title;
   card.appendChild(titleSpan);
 
+  titleSpan.addEventListener('dblclick', function() {
+    var currentTitle = titleSpan.textContent;
+
+    var renameInput = document.createElement('input');
+    renameInput.className = 'card-edit';
+    renameInput.type = 'text';
+    renameInput.value = currentTitle;
+
+    titleSpan.style.display = 'none';
+    card.insertBefore(renameInput, titleSpan);
+    renameInput.focus();
+    renameInput.select();
+
+    var done = false;
+
+    function confirmRename() {
+      if (done) return;
+      done = true;
+      var newTitle = sanitizeInput(renameInput.value);
+      if (newTitle) {
+        titleSpan.textContent = newTitle;
+      }
+      titleSpan.style.display = '';
+      renameInput.remove();
+      saveBoard();
+    }
+
+    renameInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        confirmRename();
+      } else if (e.key === 'Escape') {
+        if (done) return;
+        done = true;
+        titleSpan.style.display = '';
+        renameInput.remove();
+      }
+    });
+
+    renameInput.addEventListener('blur', confirmRename);
+  });
+
   var select = document.createElement('select');
   select.setAttribute('aria-label', 'Move to column');
   COLUMNS.forEach(function(col) {
