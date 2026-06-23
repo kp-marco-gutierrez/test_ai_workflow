@@ -101,6 +101,11 @@ ACCURACY (verify before flagging):
 - Assigning user input via `textContent`, `createTextNode`, or element property
   setters is XSS-SAFE — do NOT flag it. Only flag injection for raw-HTML sinks
   (innerHTML / insertAdjacentHTML / document.write with untrusted data).
+- Do NOT flag hypothetical, future, or defense-in-depth concerns ("in future
+  code changes", "safer to use a library like DOMPurify", "could be a problem if
+  later passed to HTML"). A security issue blocks ONLY if untrusted input
+  reaches a raw-HTML sink in the CURRENT code. Belt-and-suspenders hardening is
+  a non-blocking suggestion at most.
 - Do not raise something the code already handles (e.g. input already
   `.trim()`-ed), and if "Prior review rounds" appear below, do NOT re-raise a
   point the current code now addresses.
