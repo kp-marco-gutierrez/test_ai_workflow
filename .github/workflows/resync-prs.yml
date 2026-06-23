@@ -1,0 +1,58 @@
+name: Resync open PRs with main
+
+# When main changes (a PR merged), bring every open ai-tests PR up to date with
+# main — auto-resolving conflicts toward main — and push. Pushing via
+# PIPELINE_PAT re-triggers each PR's pipeline so it re-verifies on the new main.
+#
+# This closes the gap that leaves PRs "stuck" on conflicts: a PR that falls
+# behind main has no pull_request event to run its own sync job, and a
+# GITHUB_TOKEN push won't re-trigger runs. Requires PIPELINE_PAT to actually
+# re-trigger the PR pipelines (without it the branch is updated but the PR
+# pipeline won't auto-re-run; and this very workflow only fires if the merge to
+# main was made with the PAT, since GITHUB_TOKEN pushes don't trigger workflows).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: resync-prs
+  cancel-in-progress: false
+
+jobs:
+  resync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.PIPELINE_PAT || github.token }}
+      - name: Re-sync open ai-tests PRs with main
+        env:
+          GH_TOKEN: ${{ secrets.PIPELINE_PAT || github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main -q
+          for pr in $(gh pr list --state open --label ai-tests --json number -q '.[].number'); do
+            br=$(gh pr view "$pr" --json headRefName -q .headRefName)
+            git fetch origin "$br" -q || continue
+            if git merge-base --is-ancestor origin/main "origin/$br"; then
+              echo "#$pr ($br) already contains main — skip."
+              continue
+            fi
+            echo "#$pr ($br) is behind main — resyncing (conflicts toward main)."
+            git checkout -B _resync "origin/$br" -q
+            if git merge --no-edit -X theirs origin/main; then
+              git push origin "HEAD:$br"
+              bash scripts/retry.sh gh pr comment "$pr" -b "🔀 Re-synced with \`main\` (auto-resolved conflicts toward main) after a merge — the pipeline re-verifies on the latest main." || true
+            else
+              git merge --abort || true
+              bash scripts/retry.sh gh pr comment "$pr" -b "⚠️ Couldn't auto-resync #$pr with main (non-content conflict) — needs a look." || true
+            fi
+          done

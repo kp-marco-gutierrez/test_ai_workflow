@@ -486,7 +486,9 @@ jobs:
           fi
       - name: Squash merge
         env:
-          GH_TOKEN: ${{ github.token }}
+          # Merge via the PAT (if set) so the push to main triggers the
+          # resync-prs workflow that brings other open PRs up to date.
+          GH_TOKEN: ${{ secrets.PIPELINE_PAT || github.token }}
         run: |
           pr=${{ github.event.pull_request.number }}
           if [ "$(gh pr view "$pr" --json state -q .state)" = "MERGED" ]; then
