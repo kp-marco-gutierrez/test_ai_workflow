@@ -61,6 +61,18 @@ function createCardEl(title, currentColumn) {
   });
 
   card.appendChild(select);
+
+  var deleteBtn = document.createElement('button');
+  deleteBtn.className = 'delete';
+  deleteBtn.type = 'button';
+  deleteBtn.textContent = 'Delete';
+  deleteBtn.setAttribute('aria-label', 'Delete card');
+  deleteBtn.addEventListener('click', function() {
+    card.remove();
+    saveBoard();
+  });
+  card.appendChild(deleteBtn);
+
   return card;
 }
 
