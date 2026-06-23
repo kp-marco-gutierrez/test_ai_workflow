@@ -28,7 +28,7 @@ function createElementWithProperties(tag, props) {
 }
 
 function saveBoard() {
-  const state = {};
+  const state = {_cardCounter: _cardCounter};
   COLUMNS.forEach(name => { state[name] = []; });
   document.querySelectorAll('.column').forEach(col => {
     const header = col.querySelector('.column-header');
@@ -211,6 +211,13 @@ function createColumnEl(name, savedCards) {
         if (idx !== -1) COLUMNS[idx] = newName;
         header.textContent = newName;
         name = newName;
+        // Keep all card select options in sync with the new column name.
+        document.querySelectorAll('.card select option').forEach(function(opt) {
+          if (opt.value === currentName) {
+            opt.value = newName;
+            opt.textContent = newName;
+          }
+        });
         // Brief visual confirmation that the rename was applied.
         header.classList.add('renamed');
         setTimeout(function() { header.classList.remove('renamed'); }, 600);
@@ -324,6 +331,7 @@ function createColumnEl(name, savedCards) {
 
 const board = document.querySelector('.board-container');
 const savedState = loadBoard();
+if (savedState && savedState._cardCounter) _cardCounter = savedState._cardCounter;
 COLUMNS.forEach(name => {
   const savedCards = savedState ? (savedState[name] || []) : [];
   board.appendChild(createColumnEl(name, savedCards));

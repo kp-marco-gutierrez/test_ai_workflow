@@ -83,7 +83,7 @@ button.add-card {
   text-align: left;
 }
 button.add-card:hover { background: rgba(255,255,255,.4); }
-.error {
+.error, .rename-error {
   background: #ffebe8;
   color: #ae2a19;
   border-radius: 4px;
@@ -91,16 +91,7 @@ button.add-card:hover { background: rgba(255,255,255,.4); }
   font-size: 0.8rem;
   display: none;
 }
-.error.visible { display: block; }
-.rename-error {
-  background: #ffebe8;
-  color: #ae2a19;
-  border-radius: 4px;
-  padding: 5px 8px;
-  font-size: 0.8rem;
-  display: none;
-}
-.rename-error.visible { display: block; }
+.error.visible, .rename-error.visible { display: block; }
 .column-header.renamed {
   outline: 2px solid rgba(255,255,255,.8);
   border-radius: 3px;
