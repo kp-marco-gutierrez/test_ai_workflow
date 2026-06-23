@@ -55,36 +55,17 @@ button.add-list-btn {
 button.add-card:hover,
 button.add-list-btn:hover { background: rgba(255,255,255,.4); }
 .error {
-  background: #ffebe8;
-  color: #ae2a19;
+  background: #fef2f2;
+  color: #991b1b;
   border-radius: 4px;
   padding: 6px 8px;
   font-size: 0.8rem;
   display: none;
 }
 .error.visible { display: block; }
-.storage-notice {
-  background: #ffebe8;
-  color: #ae2a19;
+.load-error {
+  background: #fef2f2;
+  color: #991b1b;
   padding: 8px 16px;
   font-size: 0.875rem;
-  display: none;
-}
-.storage-notice.visible { display: block; }
-.add-list-form {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 220px;
-  align-self: flex-start;
-  background: rgba(255,255,255,.15);
-  border-radius: 6px;
-  padding: 12px;
-}
-input.add-list-input {
-  border: none;
-  border-radius: 4px;
-  padding: 6px 8px;
-  font-size: 0.875rem;
-  width: 100%;
 }
