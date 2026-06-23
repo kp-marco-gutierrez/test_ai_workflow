@@ -1,8 +1,31 @@
 var COLUMNS = ['To Do', 'Doing', 'Done'];
+var STORAGE_KEY = 'trello-lite-board';
 
 function sanitizeInput(value) {
-  // Strip leading/trailing whitespace; textContent assignment below prevents XSS
   return value.trim();
+}
+
+function saveBoard() {
+  var state = {};
+  COLUMNS.forEach(function(name) { state[name] = []; });
+  document.querySelectorAll('.column').forEach(function(col) {
+    var header = col.querySelector('.column-header');
+    if (!header) return;
+    var colName = header.textContent;
+    col.querySelectorAll('.card').forEach(function(card) {
+      var titleEl = card.querySelector('.card-title');
+      if (titleEl) state[colName].push(titleEl.textContent);
+    });
+  });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function loadBoard() {
+  try {
+    var saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch (e) {}
+  return null;
 }
 
 function createCardEl(title, currentColumn) {
@@ -31,6 +54,7 @@ function createCardEl(title, currentColumn) {
       var header = columns[i].querySelector('.column-header');
       if (header && header.textContent === targetName) {
         columns[i].querySelector('.cards-list').appendChild(card);
+        saveBoard();
         break;
       }
     }
@@ -40,7 +64,7 @@ function createCardEl(title, currentColumn) {
   return card;
 }
 
-function createColumnEl(name) {
+function createColumnEl(name, savedCards) {
   var col = document.createElement('div');
   col.className = 'column';
 
@@ -49,9 +73,60 @@ function createColumnEl(name) {
   header.textContent = name;
   col.appendChild(header);
 
+  header.addEventListener('dblclick', function() {
+    var currentName = header.textContent;
+
+    var renameInput = document.createElement('input');
+    renameInput.className = 'list-name-input';
+    renameInput.type = 'text';
+    renameInput.value = currentName;
+    renameInput.setAttribute('aria-label', 'List name');
+
+    header.style.display = 'none';
+    col.insertBefore(renameInput, header);
+    renameInput.focus();
+    renameInput.select();
+
+    var done = false;
+
+    function confirmRename() {
+      if (done) return;
+      done = true;
+      var newName = sanitizeInput(renameInput.value);
+      if (newName) {
+        var idx = COLUMNS.indexOf(currentName);
+        if (idx !== -1) COLUMNS[idx] = newName;
+        header.textContent = newName;
+        name = newName;
+      }
+      header.style.display = '';
+      renameInput.remove();
+    }
+
+    renameInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        confirmRename();
+      } else if (e.key === 'Escape') {
+        if (done) return;
+        done = true;
+        header.style.display = '';
+        renameInput.remove();
+      }
+    });
+
+    renameInput.addEventListener('blur', confirmRename);
+  });
+
   var cardsList = document.createElement('div');
   cardsList.className = 'cards-list';
   col.appendChild(cardsList);
+
+  if (savedCards) {
+    savedCards.forEach(function(title) {
+      cardsList.appendChild(createCardEl(title, name));
+    });
+  }
 
   var form = document.createElement('div');
   form.className = 'add-card-form';
@@ -87,6 +162,7 @@ function createColumnEl(name) {
     var card = createCardEl(title, name);
     cardsList.appendChild(card);
     input.value = '';
+    saveBoard();
   }
 
   button.addEventListener('click', addCard);
@@ -98,6 +174,8 @@ function createColumnEl(name) {
 }
 
 var board = document.querySelector('.board-container');
+var savedState = loadBoard();
 COLUMNS.forEach(function(name) {
-  board.appendChild(createColumnEl(name));
+  var savedCards = savedState ? (savedState[name] || []) : [];
+  board.appendChild(createColumnEl(name, savedCards));
 });
