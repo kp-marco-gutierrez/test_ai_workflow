@@ -74,4 +74,7 @@ jobs:
                  - title: "AI1: tests for #${{ github.event.issue.number }} <Feature>"
                  - body: "Closes #${{ github.event.issue.number }}". Note the
                    tests are expected to fail until AI2 implements the code.
+                 - Add the label `ai-tests` to the PR
+                   (`gh pr edit <num> --add-label ai-tests`) so the Test QA
+                   pipeline (dry-run gate + AI-Red-Team review) runs on it.
             7. Comment the PR link back on the issue.
