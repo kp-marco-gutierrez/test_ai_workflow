@@ -9,7 +9,9 @@
   var draggedCard = null;
 
   function sanitizeInput(value) {
-    // Strip complete and incomplete HTML tags (e.g. <img onerror=…>) to prevent injection.
+    // Strip HTML/script tags as defence-in-depth. All user-supplied strings are
+    // written back via textContent (never innerHTML), so entity-encoding is not
+    // required and would corrupt display of characters like & or <.
     return value.replace(/<[^>]*>?/gm, '').trim();
   }
 
@@ -18,6 +20,38 @@
     var el = document.createElement(tag);
     for (var k in props) el[k] = props[k];
     return el;
+  }
+
+  // Wire keyboard and blur handlers for an inline rename <input>.
+  //   onConfirm(newValue) – called on Enter; return false to abort (keep input open).
+  //   onCancel()          – called on Escape or blur when blurAction is 'cancel'.
+  //   blurAction          – 'confirm' | 'cancel'
+  //
+  // done is set to true *before* calling onConfirm so that removing the input
+  // element inside onConfirm (which synchronously fires blur) does not trigger
+  // a reentrant onCancel call. If onConfirm returns false the flag is reset.
+  function attachRenameHandlers(input, onConfirm, onCancel, blurAction) {
+    var done = false;
+
+    function doConfirm() {
+      if (done) return;
+      done = true;
+      var result = onConfirm(sanitizeInput(input.value));
+      if (result === false) done = false; // validation failed – re-arm
+    }
+
+    function doCancel() {
+      if (done) return;
+      done = true;
+      onCancel();
+    }
+
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); doConfirm(); }
+      else if (e.key === 'Escape') { doCancel(); }
+    });
+
+    input.addEventListener('blur', blurAction === 'confirm' ? doConfirm : doCancel);
   }
 
   function saveBoard() {
@@ -39,7 +73,9 @@
     try {
       var saved = localStorage.getItem(STORAGE_KEY);
       if (saved) return JSON.parse(saved);
-    } catch (e) {}
+    } catch (e) {
+      console.warn('Failed to load saved board state:', e);
+    }
     return null;
   }
 
@@ -56,6 +92,7 @@
   function createCardEl(title, currentColumn) {
     var card = makeEl('div', {className: 'card', draggable: true});
 
+    // dragend is the safety-net for HTML5 drag that ends without a drop target.
     card.addEventListener('dragstart', function(e) {
       draggedCard = card;
       e.dataTransfer.effectAllowed = 'move';
@@ -68,6 +105,8 @@
 
     // Mouse-based drag fallback for environments where HTML5 dragstart
     // is not reliably triggered (e.g. Playwright's CDP simulation).
+    // The global mouseup listener is the safety-net for mouse drags that
+    // end outside any column's mouseup handler.
     card.addEventListener('mousedown', function() {
       draggedCard = card;
     });
@@ -90,34 +129,24 @@
       editInput.focus();
       editInput.select();
 
-      var renameCompleted = false;
-
-      function confirmRename() {
-        if (renameCompleted) return;
-        renameCompleted = true;
-        var newTitle = sanitizeInput(editInput.value);
-        if (newTitle) {
-          titleSpan.textContent = newTitle;
-          title = newTitle;
-        }
+      function restoreTitle() {
         titleSpan.style.display = '';
         editInput.remove();
-        saveBoard();
       }
 
-      editInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          confirmRename();
-        } else if (e.key === 'Escape') {
-          if (renameCompleted) return;
-          renameCompleted = true;
-          titleSpan.style.display = '';
-          editInput.remove();
-        }
-      });
-
-      editInput.addEventListener('blur', confirmRename);
+      attachRenameHandlers(
+        editInput,
+        function(newTitle) {
+          if (newTitle) {
+            titleSpan.textContent = newTitle;
+            title = newTitle;
+          }
+          restoreTitle();
+          saveBoard();
+        },
+        restoreTitle,
+        'confirm'
+      );
     });
 
     var select = makeEl('select');
@@ -160,6 +189,7 @@
     header.addEventListener('dblclick', function() {
       var currentName = header.textContent;
 
+      // CSS class list-name-input is intentional: tests locate this input by that selector.
       var renameInput = makeEl('input', {
         className: 'list-name-input',
         type: 'text',
@@ -179,51 +209,39 @@
       renameInput.focus();
       renameInput.select();
 
-      var renameCompleted = false;
+      renameInput.addEventListener('input', function() {
+        renameError.classList.remove('visible');
+      });
 
-      function closeRename() {
-        if (renameCompleted) return;
-        renameCompleted = true;
+      function cleanup() {
         header.style.display = '';
         renameError.classList.remove('visible');
         renameInput.remove();
         renameError.remove();
       }
 
-      function confirmRename() {
-        if (renameCompleted) return;
-        var newName = sanitizeInput(renameInput.value);
-        // Only rename if non-empty, changed, and not a duplicate column name.
-        var isDuplicate = newName !== currentName && COLUMNS.indexOf(newName) !== -1;
-        if (isDuplicate) {
-          renameError.classList.add('visible');
-          renameInput.select();
-          return;
-        }
-        renameError.classList.remove('visible');
-        if (newName && newName !== currentName) {
-          var idx = COLUMNS.indexOf(currentName);
-          if (idx !== -1) COLUMNS[idx] = newName;
-          header.textContent = newName;
-          name = newName;
-        }
-        closeRename();
-      }
-
-      renameInput.addEventListener('input', function() {
-        renameError.classList.remove('visible');
-      });
-
-      renameInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          confirmRename();
-        } else if (e.key === 'Escape') {
-          closeRename();
-        }
-      });
-
-      renameInput.addEventListener('blur', closeRename);
+      attachRenameHandlers(
+        renameInput,
+        function(newName) {
+          var isDuplicate = newName !== currentName && COLUMNS.indexOf(newName) !== -1;
+          if (isDuplicate) {
+            renameError.classList.add('visible');
+            renameInput.select();
+            return false;
+          }
+          renameError.classList.remove('visible');
+          if (newName && newName !== currentName) {
+            var idx = COLUMNS.indexOf(currentName);
+            if (idx !== -1) COLUMNS[idx] = newName;
+            header.textContent = newName;
+            name = newName;
+          }
+          cleanup();
+          saveBoard();
+        },
+        cleanup,
+        'cancel'
+      );
     });
 
     col.addEventListener('dragover', function(e) {
