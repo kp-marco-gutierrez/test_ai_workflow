@@ -1,19 +1,19 @@
-var COLUMNS = ['To Do', 'Doing', 'Done'];
-var STORAGE_KEY = 'trello-lite-board';
+const COLUMNS = ['To Do', 'Doing', 'Done'];
+const STORAGE_KEY = 'trello-lite-board';
 
 function sanitizeInput(value) {
-  return value.trim();
+  return value.trim().replace(/<[^>]*>/g, '');
 }
 
 function saveBoard() {
-  var state = {};
-  COLUMNS.forEach(function(name) { state[name] = []; });
-  document.querySelectorAll('.column').forEach(function(col) {
-    var header = col.querySelector('.column-header');
+  const state = {};
+  COLUMNS.forEach(name => { state[name] = []; });
+  document.querySelectorAll('.column').forEach(col => {
+    const header = col.querySelector('.column-header');
     if (!header) return;
-    var colName = header.textContent;
-    col.querySelectorAll('.card').forEach(function(card) {
-      var titleEl = card.querySelector('.card-title');
+    const colName = header.textContent;
+    col.querySelectorAll('.card').forEach(card => {
+      const titleEl = card.querySelector('.card-title');
       if (titleEl) state[colName].push(titleEl.textContent);
     });
   });
@@ -22,38 +22,42 @@ function saveBoard() {
 
 function loadBoard() {
   try {
-    var saved = localStorage.getItem(STORAGE_KEY);
+    const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) return JSON.parse(saved);
   } catch (e) {}
   return null;
 }
 
+function updateColumnName(oldName, newName) {
+  const idx = COLUMNS.indexOf(oldName);
+  if (idx !== -1) COLUMNS[idx] = newName;
+}
+
 function createCardEl(title, currentColumn) {
-  var card = document.createElement('div');
+  const card = document.createElement('div');
   card.className = 'card';
 
-  var titleSpan = document.createElement('span');
+  const titleSpan = document.createElement('span');
   titleSpan.className = 'card-title';
   titleSpan.textContent = title;
   card.appendChild(titleSpan);
 
-  var select = document.createElement('select');
+  const select = document.createElement('select');
   select.setAttribute('aria-label', 'Move to column');
-  COLUMNS.forEach(function(col) {
-    var option = document.createElement('option');
+  COLUMNS.forEach(col => {
+    const option = document.createElement('option');
     option.value = col;
     option.textContent = col;
     if (col === currentColumn) option.selected = true;
     select.appendChild(option);
   });
 
-  select.addEventListener('change', function() {
-    var targetName = select.value;
-    var columns = document.querySelectorAll('.column');
-    for (var i = 0; i < columns.length; i++) {
-      var header = columns[i].querySelector('.column-header');
+  select.addEventListener('change', () => {
+    const targetName = select.value;
+    for (const col of document.querySelectorAll('.column')) {
+      const header = col.querySelector('.column-header');
       if (header && header.textContent === targetName) {
-        columns[i].querySelector('.cards-list').appendChild(card);
+        col.querySelector('.cards-list').appendChild(card);
         saveBoard();
         break;
       }
@@ -62,12 +66,12 @@ function createCardEl(title, currentColumn) {
 
   card.appendChild(select);
 
-  var deleteBtn = document.createElement('button');
+  const deleteBtn = document.createElement('button');
   deleteBtn.className = 'delete';
   deleteBtn.type = 'button';
   deleteBtn.textContent = 'Delete';
   deleteBtn.setAttribute('aria-label', 'Delete card');
-  deleteBtn.addEventListener('click', function() {
+  deleteBtn.addEventListener('click', () => {
     card.remove();
     saveBoard();
   });
@@ -77,18 +81,18 @@ function createCardEl(title, currentColumn) {
 }
 
 function createColumnEl(name, savedCards) {
-  var col = document.createElement('div');
+  const col = document.createElement('div');
   col.className = 'column';
 
-  var header = document.createElement('h2');
+  const header = document.createElement('h2');
   header.className = 'column-header';
   header.textContent = name;
   col.appendChild(header);
 
-  header.addEventListener('dblclick', function() {
-    var currentName = header.textContent;
+  header.addEventListener('dblclick', () => {
+    const currentName = header.textContent;
 
-    var renameInput = document.createElement('input');
+    const renameInput = document.createElement('input');
     renameInput.className = 'list-name-input';
     renameInput.type = 'text';
     renameInput.value = currentName;
@@ -99,15 +103,14 @@ function createColumnEl(name, savedCards) {
     renameInput.focus();
     renameInput.select();
 
-    var done = false;
+    let done = false;
 
     function confirmRename() {
       if (done) return;
       done = true;
-      var newName = sanitizeInput(renameInput.value);
+      const newName = sanitizeInput(renameInput.value);
       if (newName) {
-        var idx = COLUMNS.indexOf(currentName);
-        if (idx !== -1) COLUMNS[idx] = newName;
+        updateColumnName(currentName, newName);
         header.textContent = newName;
         name = newName;
       }
@@ -115,7 +118,7 @@ function createColumnEl(name, savedCards) {
       renameInput.remove();
     }
 
-    renameInput.addEventListener('keydown', function(e) {
+    renameInput.addEventListener('keydown', e => {
       if (e.key === 'Enter') {
         e.preventDefault();
         confirmRename();
@@ -130,33 +133,33 @@ function createColumnEl(name, savedCards) {
     renameInput.addEventListener('blur', confirmRename);
   });
 
-  var cardsList = document.createElement('div');
+  const cardsList = document.createElement('div');
   cardsList.className = 'cards-list';
   col.appendChild(cardsList);
 
   if (savedCards) {
-    savedCards.forEach(function(title) {
+    savedCards.forEach(title => {
       cardsList.appendChild(createCardEl(title, name));
     });
   }
 
-  var form = document.createElement('div');
+  const form = document.createElement('div');
   form.className = 'add-card-form';
 
-  var input = document.createElement('input');
+  const input = document.createElement('input');
   input.className = 'card-input';
   input.type = 'text';
   input.placeholder = 'Card title…';
   input.setAttribute('aria-label', 'Card title');
   form.appendChild(input);
 
-  var button = document.createElement('button');
+  const button = document.createElement('button');
   button.className = 'add-card';
   button.type = 'button';
   button.textContent = 'Add card';
   form.appendChild(button);
 
-  var errorEl = document.createElement('div');
+  const errorEl = document.createElement('div');
   errorEl.className = 'error';
   errorEl.setAttribute('role', 'alert');
   errorEl.textContent = 'Card title cannot be empty';
@@ -165,29 +168,29 @@ function createColumnEl(name, savedCards) {
   col.appendChild(form);
 
   function addCard() {
-    var title = sanitizeInput(input.value);
+    const title = sanitizeInput(input.value);
     if (!title) {
       errorEl.classList.add('visible');
       return;
     }
     errorEl.classList.remove('visible');
-    var card = createCardEl(title, name);
+    const card = createCardEl(title, name);
     cardsList.appendChild(card);
     input.value = '';
     saveBoard();
   }
 
   button.addEventListener('click', addCard);
-  input.addEventListener('keydown', function(e) {
+  input.addEventListener('keydown', e => {
     if (e.key === 'Enter') addCard();
   });
 
   return col;
 }
 
-var board = document.querySelector('.board-container');
-var savedState = loadBoard();
-COLUMNS.forEach(function(name) {
-  var savedCards = savedState ? (savedState[name] || []) : [];
+const board = document.querySelector('.board-container');
+const savedState = loadBoard();
+COLUMNS.forEach(name => {
+  const savedCards = savedState ? (savedState[name] || []) : [];
   board.appendChild(createColumnEl(name, savedCards));
 });
