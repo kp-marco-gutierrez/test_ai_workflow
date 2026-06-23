@@ -72,7 +72,8 @@ button.delete {
 button.delete:hover { background: #c03030; }
 .add-card-form { display: flex; flex-direction: column; gap: 6px; }
 input.card-input { border: none; border-radius: 4px; padding: 6px 8px; font-size: 0.875rem; width: 100%; }
-button.add-card {
+button.add-card,
+button.add-list-btn {
   background: rgba(255,255,255,.3);
   border: none;
   border-radius: 4px;
@@ -82,7 +83,8 @@ button.add-card {
   font-size: 0.875rem;
   text-align: left;
 }
-button.add-card:hover { background: rgba(255,255,255,.4); }
+button.add-card:hover,
+button.add-list-btn:hover { background: rgba(255,255,255,.4); }
 .error {
   background: #fef2f2;
   color: #991b1b;
