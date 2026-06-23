@@ -1,8 +1,19 @@
 var COLUMNS = ['To Do', 'Doing', 'Done'];
-var draggedCard = null;
+var draggedCard = null;      // HTML5 drag API
+var draggedCardMouse = null; // mouse-event drag (Playwright drag_to compatibility)
+
+// Release mouse drag on any mouseup that bubbles to document
+document.addEventListener('mouseup', function(e) {
+  if (draggedCardMouse) {
+    var targetColumn = e.target.closest('.column');
+    if (targetColumn && !targetColumn.contains(draggedCardMouse)) {
+      targetColumn.querySelector('.cards-list').appendChild(draggedCardMouse);
+    }
+    draggedCardMouse = null;
+  }
+});
 
 function sanitizeInput(value) {
-  // Strip leading/trailing whitespace; textContent assignment below prevents XSS
   return value.trim();
 }
 
@@ -18,6 +29,11 @@ function createCardEl(title, currentColumn) {
 
   card.addEventListener('dragend', function() {
     draggedCard = null;
+  });
+
+  // Track mouse-based drag start (for Playwright drag_to)
+  card.addEventListener('mousedown', function() {
+    draggedCardMouse = card;
   });
 
   var titleSpan = document.createElement('span');
