@@ -3,7 +3,7 @@ var STORAGE_KEY = 'trello-lite-board';
 var draggedCard = null;
 
 function sanitizeInput(value) {
-  return value.trim();
+  return value.trim().replace(/[<>]/g, '');
 }
 
 // Utility: create an element and assign own properties in one call.
@@ -130,9 +130,10 @@ function createColumnEl(name, savedCards) {
       if (done) return;
       done = true;
       var newName = sanitizeInput(renameInput.value);
-      // Only rename if non-empty, changed, and not a duplicate column name.
-      var isDuplicate = newName !== currentName && COLUMNS.indexOf(newName) !== -1;
-      if (newName && !isDuplicate && newName !== currentName) {
+      var nameLower = newName.toLowerCase();
+      var isDuplicate = nameLower !== currentName.toLowerCase() &&
+        COLUMNS.some(function(col) { return col.toLowerCase() === nameLower; });
+      if (newName && !isDuplicate && nameLower !== currentName.toLowerCase()) {
         var idx = COLUMNS.indexOf(currentName);
         if (idx !== -1) COLUMNS[idx] = newName;
         header.textContent = newName;
@@ -260,7 +261,16 @@ function createAddListForm() {
 
   function addList() {
     var name = sanitizeInput(input.value);
-    if (!name || COLUMNS.includes(name)) {
+    if (!name) {
+      errorEl.textContent = 'List name cannot be empty';
+      errorEl.classList.add('visible');
+      return;
+    }
+    var duplicate = COLUMNS.some(function(col) {
+      return col.toLowerCase() === name.toLowerCase();
+    });
+    if (duplicate) {
+      errorEl.textContent = 'A list with that name already exists';
       errorEl.classList.add('visible');
       return;
     }

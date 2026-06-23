@@ -41,7 +41,8 @@ h1 { font-size: 1.25rem; font-weight: 700; }
 }
 .add-card-form { display: flex; flex-direction: column; gap: 6px; }
 input.card-input { border: none; border-radius: 4px; padding: 6px 8px; font-size: 0.875rem; width: 100%; }
-button.add-card {
+button.add-card,
+button.add-list-btn {
   background: rgba(255,255,255,.3);
   border: none;
   border-radius: 4px;
@@ -51,7 +52,8 @@ button.add-card {
   font-size: 0.875rem;
   text-align: left;
 }
-button.add-card:hover { background: rgba(255,255,255,.4); }
+button.add-card:hover,
+button.add-list-btn:hover { background: rgba(255,255,255,.4); }
 .error {
   background: #ffebe8;
   color: #ae2a19;
@@ -78,14 +80,3 @@ input.add-list-input {
   font-size: 0.875rem;
   width: 100%;
 }
-button.add-list-btn {
-  background: rgba(255,255,255,.3);
-  border: none;
-  border-radius: 4px;
-  padding: 6px 10px;
-  color: #fff;
-  cursor: pointer;
-  font-size: 0.875rem;
-  text-align: left;
-}
-button.add-list-btn:hover { background: rgba(255,255,255,.4); }
