@@ -1,6 +1,7 @@
 var COLUMNS = ['To Do', 'Doing', 'Done'];
 var STORAGE_KEY = 'trello-lite-board';
 var draggedCard = null;
+var _cardCounter = 0;
 
 function sanitizeInput(value) {
   return value
@@ -42,23 +43,23 @@ function loadBoard() {
   return null;
 }
 
-// Shared handler for both HTML5 drop and mouse-based drop fallback.
-function handleCardDrop(cardsList, name) {
-  if (!draggedCard) return;
-  cardsList.appendChild(draggedCard);
-  var sel = draggedCard.querySelector('select');
-  if (sel) sel.value = name;
-  draggedCard = null;
+function moveCardToColumn(cardEl, targetColEl, cardsList, colName) {
+  if (!cardEl || cardEl.closest('.column') === targetColEl) return;
+  cardsList.appendChild(cardEl);
+  var sel = cardEl.querySelector('select');
+  if (sel) sel.value = colName;
   saveBoard();
 }
 
 function createCardEl(title, currentColumn) {
   var card = makeEl('div', {className: 'card', draggable: true});
+  var cardId = 'card-' + (++_cardCounter);
+  card.dataset.cardId = cardId;
 
   card.addEventListener('dragstart', function(e) {
     draggedCard = card;
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', title);
+    e.dataTransfer.setData('text/plain', cardId);
   });
 
   card.addEventListener('dragend', function() {
@@ -94,7 +95,7 @@ function createCardEl(title, currentColumn) {
     for (var i = 0; i < columns.length; i++) {
       var header = columns[i].querySelector('.column-header');
       if (header && header.textContent === targetName) {
-        col.querySelector('.cards-list').appendChild(card);
+        columns[i].querySelector('.cards-list').appendChild(card);
         saveBoard();
         break;
       }
@@ -178,16 +179,16 @@ function createColumnEl(name, savedCards) {
 
   col.addEventListener('drop', function(e) {
     e.preventDefault();
-    handleCardDrop(cardsList, name);
+    var id = e.dataTransfer && e.dataTransfer.getData('text/plain');
+    var srcCard = (id && document.querySelector('[data-card-id="' + id + '"]')) || draggedCard;
+    if (srcCard) moveCardToColumn(srcCard, col, cardsList, name);
+    draggedCard = null;
   });
 
-  // Mouse-based drop: handles drag_to() when HTML5 dragstart doesn't fire.
+  // Mouse-based drop: handles drag_to() when HTML5 drag events don't fire.
   col.addEventListener('mouseup', function() {
     if (!draggedCard) return;
-    var sourceCol = draggedCard.closest('.column');
-    if (sourceCol !== col) {
-      handleCardDrop(cardsList, name);
-    }
+    moveCardToColumn(draggedCard, col, cardsList, name);
     draggedCard = null;
   });
 
