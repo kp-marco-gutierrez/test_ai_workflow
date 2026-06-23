@@ -178,7 +178,6 @@ function createColumnEl(name, savedCards) {
   var errorEl = document.createElement('div');
   errorEl.className = 'error';
   errorEl.setAttribute('role', 'alert');
-  errorEl.textContent = MSG_EMPTY_CARD;
   form.appendChild(errorEl);
 
   col.appendChild(form);
@@ -186,9 +185,11 @@ function createColumnEl(name, savedCards) {
   function addCard() {
     var title = sanitizeInput(input.value);
     if (!title) {
+      errorEl.textContent = MSG_EMPTY_CARD;
       errorEl.classList.add('visible');
       return;
     }
+    errorEl.textContent = '';
     errorEl.classList.remove('visible');
     var card = createCardEl(title, name);
     cardsList.appendChild(card);
