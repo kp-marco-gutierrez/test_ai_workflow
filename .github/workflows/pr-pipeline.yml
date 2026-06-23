@@ -33,9 +33,60 @@ env:
   MAX_AI_COMMITS: "30" # loop safety cap (commits on the PR branch beyond main)
 
 jobs:
+  sync:
+    name: Sync with main (auto-resolve conflicts before merge)
+    if: contains(github.event.pull_request.labels.*.name, 'ai-tests')
+    runs-on: ubuntu-latest
+    outputs:
+      refreshed: ${{ steps.s.outputs.refreshed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          # Push with a PAT (if configured) so the refresh re-triggers a fresh
+          # run on the up-to-date branch — where claude-code-action's
+          # workflow-validation guard passes. A GITHUB_TOKEN push would NOT
+          # re-trigger, leaving Claude self-skipping on the stale workflow.
+          token: ${{ secrets.PIPELINE_PAT || github.token }}
+      - name: Merge main into the PR branch
+        id: s
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HAS_PAT: ${{ secrets.PIPELINE_PAT != '' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo "Branch already contains main — nothing to sync."
+            echo "refreshed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Branch is behind main — merging (conflicts resolved toward main)."
+          # Resolve content conflicts toward main; the PR's own changes are then
+          # re-applied by the develop loop (driven by this PR's tests) and the
+          # verify gate proves they pass on the latest main before merge.
+          if ! git merge --no-edit -X theirs origin/main; then
+            echo "::error::Merge could not be auto-resolved (non-content conflict)."
+            git merge --abort || true
+            exit 1
+          fi
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
+          if [ "$HAS_PAT" = "true" ]; then
+            # PAT push re-triggers a fresh run on the current pipeline; let it
+            # take over and skip the rest of THIS (stale-workflow) run.
+            echo "refreshed=true" >> "$GITHUB_OUTPUT"
+            bash scripts/retry.sh gh pr comment ${{ github.event.pull_request.number }} -b "🔀 **Synced with \`main\`** (auto-resolved conflicts toward main). A fresh pipeline run is starting on the updated branch." || true
+          else
+            echo "::warning::PIPELINE_PAT not set — branch updated but the run was not re-triggered, so Claude may self-skip on the stale workflow. Add the PIPELINE_PAT secret for reliable auto-refresh."
+            echo "refreshed=false" >> "$GITHUB_OUTPUT"
+          fi
+
   tests:
     name: Run tests (deterministic)
-    if: contains(github.event.pull_request.labels.*.name, 'ai-tests')
+    needs: sync
+    if: contains(github.event.pull_request.labels.*.name, 'ai-tests') && needs.sync.outputs.refreshed != 'true'
     runs-on: ubuntu-latest
     outputs:
       passed: ${{ steps.run.outputs.passed }}
@@ -337,6 +388,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Loop safety cap
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=$(git rev-list --count origin/main..HEAD || echo 0)
+          echo "AI commits so far: $n (cap ${MAX_AI_COMMITS})"
+          if [ "$n" -gt "${MAX_AI_COMMITS}" ]; then
+            bash scripts/retry.sh gh pr comment ${{ github.event.pull_request.number }} -b "⛔ Code-review loop cap reached ($n > ${MAX_AI_COMMITS} commits). Stopping for human review." || true
+            echo "::error::Review/address loop cap reached ($n > ${MAX_AI_COMMITS})."
+            exit 1
+          fi
       - uses: actions/download-artifact@v4
         with:
           name: code-review
@@ -425,6 +488,7 @@ jobs:
           issue=$(gh pr view "$pr" --json body -q .body \
             | grep -oiE 'clos(e|es|ed)[[:space:]]+#[0-9]+' | grep -oE '[0-9]+' | head -1)
           if [ -n "$issue" ]; then
+            bash scripts/retry.sh gh issue edit "$issue" --remove-label in-development || true
             gh issue close "$issue" --reason completed -c "✅ Implemented and merged in #$pr — pipeline complete." || true
           fi
           bash scripts/retry.sh gh pr comment "$pr" -b "🚀 **Merged** — full CI passed, PR squash-merged${issue:+ and issue #$issue closed}. Pipeline complete." || true
