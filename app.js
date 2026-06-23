@@ -68,6 +68,51 @@ function createCardEl(title, currentColumn) {
   var titleSpan = makeEl('span', {className: 'card-title', textContent: title});
   card.appendChild(titleSpan);
 
+  titleSpan.addEventListener('dblclick', function() {
+    var currentTitle = titleSpan.textContent;
+
+    var editInput = makeEl('input', {
+      className: 'card-edit',
+      type: 'text',
+      value: currentTitle
+    });
+    editInput.setAttribute('aria-label', 'Card title');
+
+    titleSpan.style.display = 'none';
+    card.insertBefore(editInput, titleSpan);
+    editInput.focus();
+    editInput.select();
+
+    var done = false;
+
+    function confirmRename() {
+      if (done) return;
+      done = true;
+      var newTitle = sanitizeInput(editInput.value);
+      if (newTitle) {
+        titleSpan.textContent = newTitle;
+        title = newTitle;
+      }
+      titleSpan.style.display = '';
+      editInput.remove();
+      saveBoard();
+    }
+
+    editInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        confirmRename();
+      } else if (e.key === 'Escape') {
+        if (done) return;
+        done = true;
+        titleSpan.style.display = '';
+        editInput.remove();
+      }
+    });
+
+    editInput.addEventListener('blur', confirmRename);
+  });
+
   var select = makeEl('select');
   select.setAttribute('aria-label', 'Move to column');
   COLUMNS.forEach(function(col) {
