@@ -127,6 +127,36 @@
       saveBoard();
     });
 
+    var moveUpBtn = makeEl('button', {
+      className: 'move-up',
+      type: 'button',
+      textContent: '↑'
+    });
+    moveUpBtn.setAttribute('aria-label', 'Move up');
+    moveUpBtn.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+    moveUpBtn.addEventListener('click', function() {
+      var prev = card.previousElementSibling;
+      if (prev) {
+        card.parentNode.insertBefore(card, prev);
+        saveBoard();
+      }
+    });
+
+    var moveDownBtn = makeEl('button', {
+      className: 'move-down',
+      type: 'button',
+      textContent: '↓'
+    });
+    moveDownBtn.setAttribute('aria-label', 'Move down');
+    moveDownBtn.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+    moveDownBtn.addEventListener('click', function() {
+      var next = card.nextElementSibling;
+      if (next) {
+        card.parentNode.insertBefore(next, card);
+        saveBoard();
+      }
+    });
+
     var titleSpan = makeEl('span', {className: 'card-title', textContent: title});
     card.appendChild(titleSpan);
 
@@ -193,6 +223,8 @@
     });
 
     card.appendChild(select);
+    card.appendChild(moveUpBtn);
+    card.appendChild(moveDownBtn);
     card.appendChild(deleteBtn);
     return card;
   }
