@@ -354,8 +354,23 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-4o' }}
+          GH_TOKEN: ${{ github.token }}
+          REVIEW_ROUNDS_CAP: "5"
         run: |
           verdict="$(python3 scripts/chatgpt_review.py --mode code)"
+          # Anti-runaway guard: keep fixing issues round after round, but if the
+          # review still hasn't converged after many rounds, ESCALATE TO A HUMAN.
+          # Never auto-approve code the reviewer still wants changed.
+          if [ "$verdict" = "REQUEST_CHANGES" ]; then
+            rounds=$(gh pr view ${{ github.event.pull_request.number }} --json comments \
+              -q '[.comments[]|select(.body|test("Code review\\*\\* verdict:.*REQUEST_CHANGES"))]|length')
+            echo "prior REQUEST_CHANGES rounds: $rounds (cap ${REVIEW_ROUNDS_CAP})"
+            if [ "$rounds" -ge "${REVIEW_ROUNDS_CAP}" ]; then
+              verdict="STALLED"
+              bash scripts/retry.sh gh pr edit ${{ github.event.pull_request.number }} --add-label needs-human-review || true
+              bash scripts/retry.sh gh pr comment ${{ github.event.pull_request.number }} -b "⛔ **Code review** hasn't converged after ${REVIEW_ROUNDS_CAP} rounds — pausing for human review. Outstanding points are in the latest review above. The PR is left open and NOT merged." || true
+            fi
+          fi
           echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
           { echo "review<<REVIEW_EOF"; cat review.md; echo "REVIEW_EOF"; } >> "$GITHUB_OUTPUT"
       - name: Post review comment
@@ -366,11 +381,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "${{ steps.cr.outputs.verdict }}" = "APPROVE" ]; then
+          v="${{ steps.cr.outputs.verdict }}"
+          if [ "$v" = "APPROVE" ]; then
             bash scripts/retry.sh gh pr comment ${{ github.event.pull_request.number }} -b "👀 **Code review** verdict: ✅ APPROVE → approving, running full CI, and squash-merging." || true
-          else
+          elif [ "$v" = "REQUEST_CHANGES" ]; then
             bash scripts/retry.sh gh pr comment ${{ github.event.pull_request.number }} -b "👀 **Code review** verdict: 📝 REQUEST_CHANGES → Claude will address the comments." || true
           fi
+          # STALLED → the review step already posted the human-escalation note.
       - name: Save review for the address step
         if: steps.cr.outputs.verdict == 'REQUEST_CHANGES'
         uses: actions/upload-artifact@v4
