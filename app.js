@@ -64,7 +64,7 @@
       var colName = header.textContent;
       col.querySelectorAll(SELECTOR_CARD).forEach(function(card) {
         var titleEl = card.querySelector('.card-title');
-        if (titleEl) state[colName].push({ title: titleEl.textContent, complete: card.classList.contains('complete') });
+        if (titleEl) state[colName].push({ title: titleEl.textContent, complete: card.classList.contains('complete'), description: card.dataset.description || '' });
       });
     });
     state._columns = COLUMNS.slice();
@@ -92,8 +92,48 @@
     saveBoard();
   }
 
-  function createCardEl(title, currentColumn, complete) {
+  function showCardModal(cardTitle, currentDescription, onSave) {
+    var existing = document.querySelector('.card-modal-overlay');
+    if (existing) existing.remove();
+
+    var overlay = makeEl('div', {className: 'card-modal-overlay'});
+    var modal = makeEl('div', {className: 'card-modal'});
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', cardTitle);
+
+    var titleEl = makeEl('h3', {textContent: cardTitle});
+    var descLabel = makeEl('label', {textContent: 'Description'});
+    var descField = makeEl('textarea', {className: 'card-description'});
+    descField.value = currentDescription;
+
+    var actions = makeEl('div', {className: 'modal-actions'});
+    var saveBtn = makeEl('button', {className: 'save', type: 'button', textContent: 'Save'});
+    var closeBtn = makeEl('button', {className: 'modal-close', type: 'button', textContent: 'Close'});
+
+    saveBtn.addEventListener('click', function() {
+      onSave(sanitizeInput(descField.value));
+    });
+    closeBtn.addEventListener('click', function() { overlay.remove(); });
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) overlay.remove();
+    });
+
+    actions.appendChild(saveBtn);
+    actions.appendChild(closeBtn);
+    modal.appendChild(titleEl);
+    modal.appendChild(descLabel);
+    modal.appendChild(descField);
+    modal.appendChild(actions);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    descField.focus();
+  }
+
+  function createCardEl(title, currentColumn, complete, cardDescription) {
+    var description = cardDescription || '';
     var card = makeEl('div', {className: complete ? 'card complete' : 'card'});
+    card.dataset.description = description;
 
     // dragend is the safety-net for HTML5 drag that ends without a drop target.
     card.addEventListener('dragstart', function(e) {
@@ -236,7 +276,24 @@
       }
     });
 
+    var openBtn = makeEl('button', {
+      className: 'open-card',
+      type: 'button',
+      textContent: 'Open'
+    });
+    openBtn.setAttribute('aria-label', 'Open card');
+    openBtn.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+    openBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      showCardModal(title, description, function(newDesc) {
+        description = newDesc;
+        card.dataset.description = newDesc;
+        saveBoard();
+      });
+    });
+
     card.appendChild(select);
+    card.appendChild(openBtn);
     card.appendChild(moveUpBtn);
     card.appendChild(moveDownBtn);
     card.appendChild(deleteBtn);
@@ -348,7 +405,8 @@
       savedCards.forEach(function(item) {
         var t = typeof item === 'string' ? item : item.title;
         var c = typeof item === 'string' ? false : !!item.complete;
-        cardsList.appendChild(createCardEl(t, name, c));
+        var d = typeof item === 'string' ? '' : (item.description || '');
+        cardsList.appendChild(createCardEl(t, name, c, d));
       });
     }
 

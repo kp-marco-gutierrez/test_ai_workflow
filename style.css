@@ -117,3 +117,69 @@ input.list-input {
   padding: 8px 16px;
   font-size: 0.875rem;
 }
+button.open-card {
+  background: #0052cc;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  padding: 3px 8px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  align-self: flex-start;
+}
+button.open-card:hover { background: #0041a3; }
+.card-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.card-modal {
+  background: #fff;
+  color: #333;
+  border-radius: 6px;
+  padding: 20px;
+  min-width: 320px;
+  max-width: 500px;
+  width: 90%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.card-modal h3 { font-size: 1.1rem; font-weight: 600; }
+.card-modal label { font-size: 0.875rem; font-weight: 500; }
+.card-modal .card-description {
+  width: 100%;
+  min-height: 80px;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  resize: vertical;
+  font-family: inherit;
+  color: #333;
+}
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+button.save {
+  background: #0052cc;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+button.save:hover { background: #0041a3; }
+button.modal-close {
+  background: #e0e0e0;
+  color: #333;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+button.modal-close:hover { background: #bdbdbd; }
