@@ -52,8 +52,8 @@ def column_contains_card_titled(page, column_name, card_title):
         has=page.locator(".column-header", has_text=column_name),
     )
     card = column.locator(".card", has_text=card_title)
-    assert card.count() > 0, (
-        f'Expected "{column_name}" column to contain a card titled "{card_title}"'
+    assert card.count() == 1, (
+        f'Expected "{column_name}" column to contain exactly 1 card titled "{card_title}"'
     )
 
 

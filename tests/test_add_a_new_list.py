@@ -24,7 +24,7 @@ def board_app_open(_browser):
     return page
 
 
-@when(parsers.parse('I add a list named "{list_name}"'))
+@when(parsers.re(r'I add a list named "(?P<list_name>.+)"'))
 def add_list_named(page, list_name):
     list_input = page.locator("input.list-input, input.add-list-input, input[placeholder*='list' i]").first
     list_input.fill(list_name)

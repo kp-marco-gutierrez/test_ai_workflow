@@ -10,6 +10,7 @@ Feature: Rename a card
   Scenario: Rename a card
     When I rename the card "Buy milk" to "Buy oat milk"
     Then the "To Do" column contains a card titled "Buy oat milk"
+    And the "To Do" column does not contain a card titled "Buy milk"
     And the "To Do" column shows 1 card
 
   Scenario: A blank rename is rejected
