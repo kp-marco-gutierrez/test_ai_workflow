@@ -64,7 +64,7 @@
       var colName = header.textContent;
       col.querySelectorAll(SELECTOR_CARD).forEach(function(card) {
         var titleEl = card.querySelector('.card-title');
-        if (titleEl) state[colName].push(titleEl.textContent);
+        if (titleEl) state[colName].push({ title: titleEl.textContent, complete: card.classList.contains('complete') });
       });
     });
     state._columns = COLUMNS.slice();
@@ -92,8 +92,8 @@
     saveBoard();
   }
 
-  function createCardEl(title, currentColumn) {
-    var card = makeEl('div', {className: 'card'});
+  function createCardEl(title, currentColumn, complete) {
+    var card = makeEl('div', {className: complete ? 'card complete' : 'card'});
 
     // dragend is the safety-net for HTML5 drag that ends without a drop target.
     card.addEventListener('dragstart', function(e) {
@@ -115,6 +115,19 @@
     card.addEventListener('mousedown', function() {
       draggedCard = card;
     }, true);
+
+    var checkbox = makeEl('input', {className: 'complete-toggle', type: 'checkbox'});
+    checkbox.setAttribute('aria-label', 'Mark complete');
+    checkbox.checked = !!complete;
+    checkbox.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+    checkbox.addEventListener('change', function() {
+      if (checkbox.checked) {
+        card.classList.add('complete');
+      } else {
+        card.classList.remove('complete');
+      }
+      saveBoard();
+    });
 
     var deleteBtn = makeEl('button', {
       className: 'delete',
@@ -158,6 +171,7 @@
     });
 
     var titleSpan = makeEl('span', {className: 'card-title', textContent: title});
+    card.appendChild(checkbox);
     card.appendChild(titleSpan);
 
     titleSpan.addEventListener('dblclick', function() {
@@ -331,8 +345,10 @@
     col.appendChild(cardsList);
 
     if (savedCards) {
-      savedCards.forEach(function(title) {
-        cardsList.appendChild(createCardEl(title, name));
+      savedCards.forEach(function(item) {
+        var t = typeof item === 'string' ? item : item.title;
+        var c = typeof item === 'string' ? false : !!item.complete;
+        cardsList.appendChild(createCardEl(t, name, c));
       });
     }
 
