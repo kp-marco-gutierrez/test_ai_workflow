@@ -1,28 +1,7 @@
-import os
 import re
-import pytest
-from playwright.sync_api import sync_playwright
-from pytest_bdd import given, when, then, scenarios, parsers
+from pytest_bdd import when, then, scenarios, parsers
 
 scenarios("../features/rename-a-list.feature")
-
-
-@pytest.fixture
-def _browser():
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch()
-        yield browser
-        browser.close()
-
-
-@given("the board app is open", target_fixture="page")
-def board_app_open(_browser):
-    index_html = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "index.html")
-    )
-    page = _browser.new_page()
-    page.goto(f"file://{index_html}")
-    return page
 
 
 @when(parsers.re(r'I rename the "(?P<list_name>[^"]+)" list to "(?P<new_name>[^"]*)"'))
