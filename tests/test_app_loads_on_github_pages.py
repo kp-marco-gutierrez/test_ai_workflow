@@ -1,17 +1,7 @@
 import os
-import pytest
 from pytest_bdd import given, when, then, scenarios
 
 scenarios("../features/app-loads-on-github-pages.feature")
-
-
-@pytest.fixture
-def _browser():
-    from playwright.sync_api import sync_playwright
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch()
-        yield browser
-        browser.close()
 
 
 @given("the app page is open", target_fixture="page")
