@@ -316,8 +316,9 @@
     });
 
     var deleteBtn = makeCardBtn('delete', 'Delete', 'Delete card', function() {
+      var parentCol = card.closest(SELECTOR_COLUMN);
       card.remove();
-      if (col) updateCardCount(col);
+      if (parentCol) updateCardCount(parentCol);
       saveBoard();
     });
 
@@ -467,7 +468,7 @@
     var accentSlug = name.toLowerCase().replace(/\s+/g, '');
     var header = makeEl('h2', {className: 'column-header accent-' + accentSlug});
     var nameSpan = makeEl('span', {className: 'column-name', textContent: name});
-    var countSpan = makeEl('span', {className: 'card-count', textContent: '0'});
+    var countSpan = makeEl('span', {className: 'card-count'});
     countSpan.style.display = 'none';
     header.appendChild(nameSpan);
     header.appendChild(countSpan);
