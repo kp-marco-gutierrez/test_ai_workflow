@@ -684,15 +684,49 @@
     draggedCard = null;
   });
 
+  var activeLabelFilter = null;
+
+  function applyFilters() {
+    var term = (document.getElementById('search') || {value: ''}).value.toLowerCase();
+    document.querySelectorAll(SELECTOR_CARD).forEach(function(card) {
+      var titleEl = card.querySelector('.card-title');
+      var title = titleEl ? titleEl.textContent.toLowerCase() : '';
+      var matchesSearch = !term || title.indexOf(term) !== -1;
+      var matchesLabel = !activeLabelFilter || card.querySelector('[data-color="' + activeLabelFilter + '"]') !== null;
+      card.style.display = (matchesSearch && matchesLabel) ? '' : 'none';
+    });
+  }
+
   var searchInput = document.getElementById('search');
   if (searchInput) {
-    searchInput.addEventListener('input', function() {
-      var term = searchInput.value.toLowerCase();
-      document.querySelectorAll(SELECTOR_CARD).forEach(function(card) {
-        var titleEl = card.querySelector('.card-title');
-        var title = titleEl ? titleEl.textContent.toLowerCase() : '';
-        card.style.display = (!term || title.indexOf(term) !== -1) ? '' : 'none';
+    searchInput.addEventListener('input', applyFilters);
+  }
+
+  var filterControls = document.getElementById('label-filter-controls');
+  if (filterControls) {
+    LABEL_COLORS.forEach(function(color) {
+      var btn = makeEl('button', {
+        className: 'filter-label-' + color,
+        type: 'button',
+        textContent: color
       });
+      btn.setAttribute('data-filter-label', color);
+      btn.addEventListener('click', function() {
+        activeLabelFilter = color;
+        applyFilters();
+      });
+      filterControls.appendChild(btn);
     });
+
+    var clearBtn = makeEl('button', {
+      className: 'clear-label-filter',
+      type: 'button',
+      textContent: 'All'
+    });
+    clearBtn.addEventListener('click', function() {
+      activeLabelFilter = null;
+      applyFilters();
+    });
+    filterControls.appendChild(clearBtn);
   }
 })();
