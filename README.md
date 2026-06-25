@@ -6,7 +6,7 @@ A Kanban-style project board that ships via a fully automated AI-assisted delive
 
 Features are built by AI and shipped through deterministic CI: the pipeline decides pass or fail based on BDD specs that were written before any implementation exists.
 
-See the full slide deck: [docs/pipeline-deck.html](docs/pipeline-deck.html)
+See the full slide deck: [docs/pipeline-deck.html](https://kp-marco-gutierrez.github.io/test_ai_workflow/docs/pipeline-deck.html)
 
 ### How it works
 
