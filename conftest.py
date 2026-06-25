@@ -4,7 +4,7 @@ import sys
 
 import pytest
 from playwright.sync_api import sync_playwright
-from pytest_bdd import given, when, parsers
+from pytest_bdd import given, when, then, parsers
 
 
 def pytest_configure(config):
@@ -52,6 +52,24 @@ def card_exists_in_column(page, card_title, column_name):
 # for `{}` fields, so it cannot match empty strings.  These re-based steps
 # cover only the empty-string cases without conflicting with the parsers.parse
 # steps in the test files for non-empty values.
+@given(parsers.parse('I move the card "{card_title}" up in the "{column_name}" column'))
+def given_move_card_up(page, card_title, column_name):
+    column = page.locator(
+        ".column",
+        has=page.locator(".column-header", has_text=column_name),
+    )
+    card = column.locator(".card", has_text=card_title).first
+    move_up_button = card.locator(
+        "button.move-up, button[data-action='move-up'], button:has-text('↑'), button:has-text('Up'), button[aria-label='Move up']"
+    ).first
+    move_up_button.click()
+
+
+@when("I reload the page")
+def reload_page_shared(page):
+    page.reload()
+
+
 @when(parsers.re(r'I rename the card "(?P<card_title>[^"]+)" to ""'))
 def rename_card_to_empty(page, card_title):
     card = page.locator(".card", has_text=card_title).first
@@ -139,3 +157,22 @@ def move_card_to_column(page, card_title, target_column):
     card = page.locator(".card", has_text=card_title).first
     move_select = card.locator("select")
     move_select.select_option(label=target_column)
+
+
+@then(parsers.parse('the "{column_name}" column lists "{first_card}" before "{second_card}"'))
+def column_lists_card_before_other_shared(page, column_name, first_card, second_card):
+    column = page.locator(
+        ".column",
+        has=page.locator(".column-header", has_text=column_name),
+    )
+    cards = column.locator(".card")
+    count = cards.count()
+    titles = [cards.nth(i).inner_text() for i in range(count)]
+    first_indices = [i for i, t in enumerate(titles) if first_card in t]
+    second_indices = [i for i, t in enumerate(titles) if second_card in t]
+    assert first_indices, f'Card "{first_card}" not found in "{column_name}" column'
+    assert second_indices, f'Card "{second_card}" not found in "{column_name}" column'
+    assert first_indices[0] < second_indices[0], (
+        f'Expected "{first_card}" (index {first_indices[0]}) to appear before '
+        f'"{second_card}" (index {second_indices[0]}) in "{column_name}" column'
+    )

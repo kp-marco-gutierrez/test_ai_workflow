@@ -70,8 +70,19 @@
     COLUMNS = [];
     document.querySelectorAll(SELECTOR_COLUMN).forEach(function(col) {
       var header = col.querySelector(SELECTOR_COLUMN_HEADER);
-      if (header) COLUMNS.push(header.textContent);
+      if (header) {
+        var nameEl = header.querySelector('.column-name');
+        COLUMNS.push(nameEl ? nameEl.textContent : header.textContent);
+      }
     });
+  }
+
+  function updateCardCount(col) {
+    var countEl = col.querySelector('.column-header .card-count');
+    if (countEl) {
+      countEl.textContent = col.querySelectorAll('.cards-list .card').length;
+      countEl.style.display = '';
+    }
   }
 
   function saveBoard() {
@@ -80,7 +91,8 @@
     document.querySelectorAll(SELECTOR_COLUMN).forEach(function(col) {
       var header = col.querySelector(SELECTOR_COLUMN_HEADER);
       if (!header) return;
-      var colName = header.textContent;
+      var nameEl = header.querySelector('.column-name');
+      var colName = nameEl ? nameEl.textContent : header.textContent;
       col.querySelectorAll(SELECTOR_CARD).forEach(function(card) {
         var titleEl = card.querySelector('.card-title');
         if (titleEl) {
@@ -110,9 +122,13 @@
   // Shared handler for both HTML5 drop and mouse-based drop fallback.
   function handleCardDrop(cardsList, name) {
     if (!draggedCard) return;
+    var sourceCol = draggedCard.closest(SELECTOR_COLUMN);
     cardsList.appendChild(draggedCard);
     var sel = draggedCard.querySelector('select');
     if (sel) sel.value = name;
+    var targetCol = cardsList.closest(SELECTOR_COLUMN);
+    if (sourceCol) updateCardCount(sourceCol);
+    if (targetCol && targetCol !== sourceCol) updateCardCount(targetCol);
     draggedCard = null;
     saveBoard();
   }
@@ -300,7 +316,9 @@
     });
 
     var deleteBtn = makeCardBtn('delete', 'Delete', 'Delete card', function() {
+      var parentCol = card.closest(SELECTOR_COLUMN);
       card.remove();
+      if (parentCol) updateCardCount(parentCol);
       saveBoard();
     });
 
@@ -388,11 +406,16 @@
 
     select.addEventListener('change', function() {
       var targetName = select.value;
+      var sourceCol = card.closest(SELECTOR_COLUMN);
       var columns = document.querySelectorAll(SELECTOR_COLUMN);
       for (var i = 0; i < columns.length; i++) {
-        var header = columns[i].querySelector(SELECTOR_COLUMN_HEADER);
-        if (header && header.textContent === targetName) {
+        var h = columns[i].querySelector(SELECTOR_COLUMN_HEADER);
+        var hNameEl = h && h.querySelector('.column-name');
+        var hName = hNameEl ? hNameEl.textContent : (h ? h.textContent : '');
+        if (hName === targetName) {
           columns[i].querySelector(SELECTOR_CARDS_LIST).appendChild(card);
+          if (sourceCol) updateCardCount(sourceCol);
+          updateCardCount(columns[i]);
           saveBoard();
           break;
         }
@@ -443,7 +466,12 @@
     var col = makeEl('div', {className: 'column'});
 
     var accentSlug = name.toLowerCase().replace(/\s+/g, '');
-    var header = makeEl('h2', {className: 'column-header accent-' + accentSlug, textContent: name});
+    var header = makeEl('h2', {className: 'column-header accent-' + accentSlug});
+    var nameSpan = makeEl('span', {className: 'column-name', textContent: name});
+    var countSpan = makeEl('span', {className: 'card-count'});
+    countSpan.style.display = 'none';
+    header.appendChild(nameSpan);
+    header.appendChild(countSpan);
     col.appendChild(header);
 
     var deleteBtn = makeEl('button', {
@@ -507,7 +535,7 @@
     col.appendChild(clearCompletedBtn);
 
     header.addEventListener('dblclick', function() {
-      var currentName = header.textContent;
+      var currentName = nameSpan.textContent;
 
       // CSS class list-name-input is intentional: tests locate this input by that selector.
       var renameInput = makeEl('input', {
@@ -553,7 +581,7 @@
           if (newName && newName !== currentName) {
             var idx = COLUMNS.indexOf(currentName);
             if (idx !== -1) COLUMNS[idx] = newName;
-            header.textContent = newName;
+            nameSpan.textContent = newName;
             name = newName;
           }
           cleanup();
@@ -607,6 +635,7 @@
         cardsList.appendChild(createCardEl(t, name, c, d, l, dd));
       });
     }
+    if (savedCards && savedCards.length) updateCardCount(col);
 
     updatePlaceholder();
 
@@ -656,6 +685,7 @@
       }
       cardsList.appendChild(createCardEl(title, name));
       input.value = '';
+      updateCardCount(col);
       saveBoard();
     }
 
