@@ -2,6 +2,8 @@
 
 A Kanban-style project board that ships via a fully automated AI-assisted delivery pipeline.
 
+**[Live Trello-lite app](https://kp-marco-gutierrez.github.io/test_ai_workflow/)**
+
 ## Delivery Pipeline
 
 Features are built by AI and shipped through deterministic CI: the pipeline decides pass or fail based on BDD specs that were written before any implementation exists.
