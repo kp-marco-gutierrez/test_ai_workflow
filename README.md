@@ -12,12 +12,20 @@ See the full slide deck: [docs/pipeline-deck.html](https://kp-marco-gutierrez.gi
 
 ```mermaid
 flowchart LR
-    Spec["Spec (BDD feature)"] --> tests["tests run in CI"]
-    tests --> review["AI code review"]
-    review --> deploy["deploy to GitHub Pages"]
+    Spec["Spec (BDD feature)"] --> dryrun["dry-run gate: tests must fail first"]
+    dryrun --> implement["implement"]
+    implement --> verify["verify"]
+    verify --> review["code review + AI-Red-Team"]
+    review --> merge["squash-merge"]
+    merge --> tests["tests run in CI"]
+    tests --> deploy["deploy to GitHub Pages"]
 ```
 
 1. **Spec** — a `.feature` file captures the desired behaviour before any code is written.
-2. **tests** — pytest-bdd runs the scenarios deterministically; the pipeline decides pass or fail.
-3. **review** — an AI implementer writes the code; a reviewer checks it.
-4. **deploy** — once tests pass the site is deployed to GitHub Pages automatically.
+2. **dry-run gate** — the pipeline runs tests first; they must fail to prove the spec is genuine before implementation starts.
+3. **implement** — an AI implementer writes the code to satisfy the spec.
+4. **verify** — the implementation is verified against the spec scenarios.
+5. **code review + AI-Red-Team** — an AI-Red-Team reviews for security and correctness; a human reviewer checks the code.
+6. **squash-merge** — approved changes are squash-merged into main.
+7. **tests** — pytest-bdd runs the scenarios deterministically; the pipeline decides pass or fail.
+8. **deploy** — once tests pass the site is deployed to GitHub Pages automatically.
