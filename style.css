@@ -1,4 +1,5 @@
-* { box-sizing: border-box; margin: 0; padding: 0; }
+*, *::before, *::after { box-sizing: border-box; }
+body, h1, h2, h3, h4, h5, h6, p, ul, ol, li, dl, dt, dd, figure, blockquote { margin: 0; padding: 0; }
 body { font-family: sans-serif; background: #0052cc; color: #fff; min-height: 100vh; }
 header { padding: 12px 16px; background: rgba(0,0,0,.15); }
 h1 { font-size: 1.25rem; font-weight: 700; }
