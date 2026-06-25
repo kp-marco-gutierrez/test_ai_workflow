@@ -26,5 +26,11 @@ def card_is_visible(page, card_title):
 
 @then(parsers.parse('the card "{card_title}" is hidden'))
 def card_is_hidden(page, card_title):
-    card = page.locator(".card", has_text=card_title).first
-    assert not card.is_visible(), f'Expected card "{card_title}" to be hidden but it was visible'
+    cards = page.locator(".card", has_text=card_title)
+    assert cards.count() > 0, (
+        f'Expected card "{card_title}" to exist in the DOM (hidden by filter), '
+        f'but it was not found at all — check that the Background card setup ran'
+    )
+    assert not cards.first.is_visible(), (
+        f'Expected card "{card_title}" to be hidden by the search filter but it was visible'
+    )
