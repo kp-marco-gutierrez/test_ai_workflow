@@ -27,6 +27,9 @@ def card_has_label_setup(page, card_title, color):
     assert color_indicator.count() > 0, (
         f'Setup failed: "{color}" label color indicator not found on card "{card_title}" after adding'
     )
+    assert color_indicator.first.is_visible(), (
+        f'Setup failed: "{color}" label color indicator on card "{card_title}" is not visible'
+    )
 
 
 @when(parsers.parse('I add a "{color}" label to the card "{card_title}"'))
@@ -80,6 +83,13 @@ def card_shows_label_color(page, card_title, color):
     )
     assert color_indicator.first.is_visible(), (
         f'Expected "{color}" label color indicator on card "{card_title}" to be visible'
+    )
+    bg_color = color_indicator.first.evaluate(
+        "el => getComputedStyle(el).backgroundColor"
+    )
+    assert bg_color not in ("", "transparent", "rgba(0, 0, 0, 0)"), (
+        f'Expected "{color}" label on card "{card_title}" to have a visibly distinct '
+        f'background color, but computed background-color was "{bg_color}"'
     )
 
 

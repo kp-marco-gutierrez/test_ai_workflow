@@ -33,6 +33,12 @@ def column_shows_placeholder(page, column_name, placeholder_text):
     assert placeholder.count() > 0 and placeholder.first.is_visible(), (
         f'Expected "{column_name}" column to show placeholder "{placeholder_text}"'
     )
+    cards = column.locator(".card")
+    visible_cards = sum(1 for i in range(cards.count()) if cards.nth(i).is_visible())
+    assert visible_cards == 0, (
+        f'Expected "{column_name}" column to have no visible cards when showing placeholder, '
+        f'but found {visible_cards} visible card(s)'
+    )
 
 
 @then(parsers.parse('the "{column_name}" column does not show the placeholder "{placeholder_text}"'))

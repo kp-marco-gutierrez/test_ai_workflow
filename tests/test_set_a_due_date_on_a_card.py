@@ -118,7 +118,11 @@ def card_shows_no_due_date(page, card_title):
         return
     due_date_el = card.locator(
         ".due-date, .card-due-date, [data-field='due-date'], [class*='due']"
-    ).filter(has_text=True)
-    assert due_date_el.count() == 0, (
-        f'Expected no due date on card "{card_title}", but found one'
     )
+    for i in range(due_date_el.count()):
+        el = due_date_el.nth(i)
+        if el.is_visible() and el.inner_text().strip():
+            raise AssertionError(
+                f'Expected no due date on card "{card_title}", '
+                f'but found a visible element with text "{el.inner_text().strip()}"'
+            )

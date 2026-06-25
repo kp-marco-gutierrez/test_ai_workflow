@@ -28,8 +28,13 @@ def check_document_title(page):
 
 @then('the heading "Trello-lite" is visible')
 def check_heading_visible(page):
-    heading = page.locator("h1", has_text="Trello-lite")
-    assert heading.is_visible(), 'Expected heading "Trello-lite" to be visible'
+    heading = page.get_by_role("heading", name="Trello-lite", exact=True)
+    assert heading.count() > 0, 'Expected a heading element with exact text "Trello-lite" to exist'
+    assert heading.first.is_visible(), 'Expected heading "Trello-lite" to be visible'
+    actual_text = heading.first.text_content().strip()
+    assert actual_text == "Trello-lite", (
+        f'Expected heading text to be exactly "Trello-lite", got "{actual_text}"'
+    )
 
 
 @then("a board container is visible")
