@@ -72,3 +72,70 @@ def add_empty_card_to_column(page, column_name):
     card_input.fill("")
     add_button = column.locator("button.add-card, button[type='submit'], .add-card-btn").first
     add_button.click()
+
+
+@when(parsers.parse('I add a card "{card_title}" to the "{column_name}" column'))
+def add_card_to_column(page, card_title, column_name):
+    column = page.locator(
+        ".column",
+        has=page.locator(".column-header", has_text=column_name),
+    )
+    card_input = column.locator("input.card-input, input[type='text']").first
+    card_input.fill(card_title)
+    add_button = column.locator("button.add-card, button[type='submit'], .add-card-btn").first
+    add_button.click()
+
+
+@when(parsers.parse('I add a "{color}" label to the card "{card_title}"'))
+def add_label_to_card(page, color, card_title):
+    card = page.locator(".card", has_text=card_title).first
+    open_btn = card.locator(
+        "button.label, button.add-label, button[data-action='label'], "
+        "button:has-text('Label'), .label-btn"
+    )
+    open_btn.first.click()
+    color_option = page.locator(
+        f".label-picker [data-color='{color}'], "
+        f".label-picker .label-{color}, "
+        f".dropdown [data-color='{color}'], "
+        f".popover [data-color='{color}'], "
+        f"[role='menu'] [data-color='{color}']"
+    )
+    color_option.first.wait_for(state="visible", timeout=5000)
+    color_option.first.click()
+
+
+@when(parsers.parse('I set the due date of the card "{card_title}" to "{due_date}"'))
+def set_due_date(page, card_title, due_date):
+    card = page.locator(".card", has_text=card_title).first
+    date_input = card.locator("input[type='date']")
+    if date_input.count() > 0:
+        date_input.first.fill(due_date)
+        date_input.first.press("Tab")
+    else:
+        card.click()
+        detail = page.locator(".card-modal, .card-detail, .modal, [role='dialog']")
+        detail.wait_for(state="visible", timeout=5000)
+        date_field = detail.locator(
+            "input[type='date'].due-date, input[type='date'], input.due-date"
+        ).first
+        date_field.fill(due_date)
+        save_button = detail.locator(
+            "button.save, button.save-due-date, button[data-action='save'], button:has-text('Save')"
+        )
+        if save_button.count() > 0:
+            save_button.first.click()
+        else:
+            date_field.press("Enter")
+        close_button = detail.locator(
+            "button.close, button[data-action='close'], button:has-text('Close'), button:has-text('×')"
+        )
+        if close_button.count() > 0:
+            close_button.first.click()
+
+
+@when(parsers.parse('I move the card "{card_title}" to the "{target_column}" column'))
+def move_card_to_column(page, card_title, target_column):
+    card = page.locator(".card", has_text=card_title).first
+    move_select = card.locator("select")
+    move_select.select_option(label=target_column)
