@@ -87,7 +87,7 @@
           var labelEls = card.querySelectorAll('.card-labels .label[data-color]');
           var savedLabels = [];
           for (var li = 0; li < labelEls.length; li++) { savedLabels.push(labelEls[li].dataset.color); }
-          state[colName].push({ title: titleEl.textContent, complete: card.classList.contains('complete'), description: card.dataset.description || '', labels: savedLabels });
+          state[colName].push({ title: titleEl.textContent, complete: card.classList.contains('complete'), description: card.dataset.description || '', labels: savedLabels, dueDate: card.dataset.dueDate || '' });
         }
       });
     });
@@ -116,7 +116,7 @@
     saveBoard();
   }
 
-  function showCardModal(cardTitle, currentDescription, onSave) {
+  function showCardModal(cardTitle, currentDescription, currentDueDate, onSave) {
     var existing = document.querySelector('.card-modal-overlay');
     if (existing) existing.remove();
 
@@ -131,12 +131,16 @@
     var descField = makeEl('textarea', {className: 'card-description'});
     descField.value = currentDescription;
 
+    var dueDateLabel = makeEl('label', {textContent: 'Due Date'});
+    var dueDateField = makeEl('input', {className: 'due-date', type: 'date'});
+    dueDateField.value = currentDueDate || '';
+
     var actions = makeEl('div', {className: 'modal-actions'});
     var saveBtn = makeEl('button', {className: 'save', type: 'button', textContent: 'Save'});
     var closeBtn = makeEl('button', {className: 'modal-close', type: 'button', textContent: 'Close'});
 
     saveBtn.addEventListener('click', function() {
-      onSave(sanitizeInput(descField.value));
+      onSave(sanitizeInput(descField.value), dueDateField.value);
     });
     closeBtn.addEventListener('click', function() { overlay.remove(); });
     overlay.addEventListener('click', function(e) {
@@ -148,6 +152,8 @@
     modal.appendChild(titleEl);
     modal.appendChild(descLabel);
     modal.appendChild(descField);
+    modal.appendChild(dueDateLabel);
+    modal.appendChild(dueDateField);
     modal.appendChild(actions);
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
@@ -217,11 +223,13 @@
     }, 0);
   }
 
-  function createCardEl(title, currentColumn, complete, cardDescription, cardLabels) {
+  function createCardEl(title, currentColumn, complete, cardDescription, cardLabels, cardDueDate) {
     var description = cardDescription || '';
     var labels = cardLabels ? cardLabels.slice() : [];
+    var dueDate = cardDueDate || '';
     var card = makeEl('div', {className: complete ? 'card complete' : 'card'});
     card.dataset.description = description;
+    card.dataset.dueDate = dueDate;
 
     // dragend is the safety-net for HTML5 drag that ends without a drop target.
     card.addEventListener('dragstart', function(e) {
@@ -289,9 +297,11 @@
     });
 
     var titleSpan = makeEl('span', {className: 'card-title', textContent: title});
+    var dueDateSpan = makeEl('span', {className: 'card-due-date', textContent: dueDate});
     card.appendChild(checkbox);
     card.appendChild(labelsArea);
     card.appendChild(titleSpan);
+    card.appendChild(dueDateSpan);
 
     titleSpan.addEventListener('dblclick', function() {
       var currentTitle = titleSpan.textContent;
@@ -357,11 +367,31 @@
 
     var openBtn = makeCardBtn('open-card', 'Open', 'Open card', function(e) {
       e.stopPropagation();
-      showCardModal(title, description, function(newDesc) {
+      showCardModal(title, description, dueDate, function(newDesc, newDueDate) {
         description = newDesc;
         card.dataset.description = newDesc;
+        dueDate = newDueDate;
+        card.dataset.dueDate = newDueDate;
+        dueDateSpan.textContent = newDueDate;
         saveBoard();
       });
+    });
+
+    var singleClickTimer = null;
+    card.addEventListener('click', function(e) {
+      if (e.target.closest('button') || e.target.closest('select') || e.target.closest('input')) return;
+      clearTimeout(singleClickTimer);
+      if (e.detail >= 2) return; // second click of a dblclick — let the dblclick handler take over
+      singleClickTimer = setTimeout(function() {
+        showCardModal(title, description, dueDate, function(newDesc, newDueDate) {
+          description = newDesc;
+          card.dataset.description = newDesc;
+          dueDate = newDueDate;
+          card.dataset.dueDate = newDueDate;
+          dueDateSpan.textContent = newDueDate;
+          saveBoard();
+        });
+      }, 300);
     });
 
     card.appendChild(select);
@@ -512,7 +542,8 @@
         var c = typeof item === 'string' ? false : !!item.complete;
         var d = typeof item === 'string' ? '' : (item.description || '');
         var l = typeof item === 'string' ? [] : (item.labels || []);
-        cardsList.appendChild(createCardEl(t, name, c, d, l));
+        var dd = typeof item === 'string' ? '' : (item.dueDate || '');
+        cardsList.appendChild(createCardEl(t, name, c, d, l, dd));
       });
     }
 
@@ -543,6 +574,7 @@
     col.appendChild(form);
 
     function addCard() {
+      errorEl.classList.remove('visible');
       var title = sanitizeInput(input.value);
       if (!title) {
         errorEl.textContent = 'Card title cannot be empty';
@@ -556,7 +588,6 @@
         input.focus();
         return;
       }
-      errorEl.classList.remove('visible');
       cardsList.appendChild(createCardEl(title, name));
       input.value = '';
       saveBoard();
