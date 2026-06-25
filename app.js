@@ -683,4 +683,16 @@
   document.addEventListener('mouseleave', function() {
     draggedCard = null;
   });
+
+  var searchInput = document.getElementById('search');
+  if (searchInput) {
+    searchInput.addEventListener('input', function() {
+      var term = searchInput.value.toLowerCase();
+      document.querySelectorAll(SELECTOR_CARD).forEach(function(card) {
+        var titleEl = card.querySelector('.card-title');
+        var title = titleEl ? titleEl.textContent.toLowerCase() : '';
+        card.style.display = (!term || title.indexOf(term) !== -1) ? '' : 'none';
+      });
+    });
+  }
 })();
