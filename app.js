@@ -574,6 +574,7 @@
     col.appendChild(form);
 
     function addCard() {
+      errorEl.classList.remove('visible');
       var title = sanitizeInput(input.value);
       if (!title) {
         errorEl.textContent = 'Card title cannot be empty';
@@ -587,7 +588,6 @@
         input.focus();
         return;
       }
-      errorEl.classList.remove('visible');
       cardsList.appendChild(createCardEl(title, name));
       input.value = '';
       saveBoard();
