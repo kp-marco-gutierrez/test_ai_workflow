@@ -770,4 +770,24 @@
     });
     filterControls.appendChild(clearBtn);
   }
+
+  // Dark mode toggle
+  var THEME_KEY = 'trello-lite-theme';
+  var themeToggle = document.getElementById('theme-toggle');
+  if (themeToggle) {
+    var savedTheme = localStorage.getItem(THEME_KEY);
+    if (savedTheme === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+    themeToggle.addEventListener('click', function() {
+      var current = document.documentElement.getAttribute('data-theme');
+      if (current === 'dark') {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.removeItem(THEME_KEY);
+      } else {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        localStorage.setItem(THEME_KEY, 'dark');
+      }
+    });
+  }
 })();
