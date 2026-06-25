@@ -46,7 +46,17 @@ jobs:
               echo "#$pr ($br) already contains main — skip."
               continue
             fi
-            echo "#$pr ($br) is behind main — resyncing (conflicts toward main)."
+            # Don't interrupt a PR that's actively running — re-syncing it now
+            # would cancel/supersede its in-flight run and starve it. Leave it;
+            # it'll be re-synced on a later main push once it's idle.
+            active=$(gh run list --branch "$br" \
+              --workflow="PR Pipeline (deterministic gates + AI generation)" \
+              --json status -q '[.[]|select(.status!="completed")]|length' 2>/dev/null || echo 0)
+            if [ "${active:-0}" -gt 0 ]; then
+              echo "#$pr ($br) has an active run — skip (don't interrupt)."
+              continue
+            fi
+            echo "#$pr ($br) is behind main and idle — resyncing (conflicts toward main)."
             git checkout -B _resync "origin/$br" -q
             if git merge --no-edit -X theirs origin/main; then
               git push origin "HEAD:$br"
