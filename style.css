@@ -104,6 +104,12 @@ button.add-list-btn:hover { background: rgba(255,255,255,.4); }
   display: none;
 }
 .error.visible { display: block; }
+input.input-error { outline: 2px solid #eb5a46; }
+.label-picker-hint {
+  font-size: 0.75rem;
+  color: #666;
+  padding: 0 2px 2px;
+}
 .add-list-section {
   display: flex;
   flex-direction: column;
