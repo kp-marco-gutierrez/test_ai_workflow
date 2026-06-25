@@ -79,7 +79,10 @@
 
   function updateCardCount(col) {
     var countEl = col.querySelector('.column-header .card-count');
-    if (countEl) countEl.textContent = col.querySelectorAll('.cards-list .card').length;
+    if (countEl) {
+      countEl.textContent = col.querySelectorAll('.cards-list .card').length;
+      countEl.style.display = '';
+    }
   }
 
   function saveBoard() {
@@ -462,7 +465,12 @@
     var col = makeEl('div', {className: 'column'});
 
     var accentSlug = name.toLowerCase().replace(/\s+/g, '');
-    var header = makeEl('h2', {className: 'column-header accent-' + accentSlug, textContent: name});
+    var header = makeEl('h2', {className: 'column-header accent-' + accentSlug});
+    var nameSpan = makeEl('span', {className: 'column-name', textContent: name});
+    var countSpan = makeEl('span', {className: 'card-count', textContent: '0'});
+    countSpan.style.display = 'none';
+    header.appendChild(nameSpan);
+    header.appendChild(countSpan);
     col.appendChild(header);
 
     var deleteBtn = makeEl('button', {
@@ -626,7 +634,7 @@
         cardsList.appendChild(createCardEl(t, name, c, d, l, dd));
       });
     }
-    updateCardCount(col);
+    if (savedCards && savedCards.length) updateCardCount(col);
 
     updatePlaceholder();
 
