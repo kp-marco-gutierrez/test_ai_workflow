@@ -203,10 +203,16 @@
 
     var rect = anchorEl.getBoundingClientRect();
     picker.style.position = 'fixed';
-    picker.style.top = rect.bottom + 'px';
     picker.style.left = rect.left + 'px';
+    picker.style.top = rect.bottom + 'px';
     picker.style.zIndex = '2000';
     document.body.appendChild(picker);
+
+    // Reposition above the anchor if the picker overflows the bottom of the viewport.
+    var pickerH = picker.offsetHeight;
+    if (rect.bottom + pickerH > window.innerHeight) {
+      picker.style.top = Math.max(0, rect.top - pickerH) + 'px';
+    }
 
     function closePicker() {
       if (picker.parentNode) picker.remove();
