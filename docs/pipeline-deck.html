@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI-Only Delivery Pipeline</title>
+</head>
+<body>
+<!--
+  ============================================================================
+  AI-ONLY DELIVERY PIPELINE — slide deck
+  ----------------------------------------------------------------------------
+  HOW TO EDIT
+    • Each slide is a  <section class="slide">  block. Edit the text directly.
+    • Colors & fonts live in the :root variables just below — change them once.
+    • Navigate: ← / → arrow keys, Space, the on-screen arrows, or the dots.
+  ============================================================================
+-->
+<style>
+  :root {
+    /* ---- palette (edit here) ---- */
+    --ground:   #0C1226;   /* deep indigo-navy */
+    --panel:    #151E3B;
+    --panel-2:  #1C2750;
+    --line:     #2B3768;
+    --text:     #E6EBF5;
+    --muted:    #8C99BE;
+    --accent:   #6C8CFF;   /* periwinkle — AI / automation (the brand colour) */
+    --claude:   #6C8CFF;   /* generation (Claude) */
+    --gpt:      #2DD4A7;   /* review (ChatGPT) */
+    --pass:     #34D399;   /* deterministic gate: pass */
+    --fail:     #F2555A;   /* deterministic gate: must-fail */
+    --amber:    #F4B740;   /* deterministic CI / human touchpoint */
+
+    /* ---- type ---- */
+    --sans: "Inter", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--ground);
+    color: var(--text);
+    font-family: var(--sans);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* faint blueprint grid + glow so the dark ground isn't flat */
+  .bg {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      radial-gradient(900px 600px at 82% -10%, rgba(108,140,255,.16), transparent 60%),
+      radial-gradient(700px 500px at 0% 110%, rgba(45,212,167,.10), transparent 60%),
+      linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 46px 46px, 46px 46px;
+  }
+
+  /* ---- deck mechanics ---- */
+  .deck { position: relative; z-index: 1; height: 100vh; overflow: hidden; }
+  .track {
+    display: flex; height: 100%;
+    transition: transform .5s cubic-bezier(.7,.05,.2,1);
+  }
+  .slide {
+    position: relative;
+    min-width: 100vw; height: 100vh;
+    padding: clamp(28px, 6vw, 96px);
+    display: flex; flex-direction: column; justify-content: center;
+    gap: 22px;
+  }
+  .slide-inner { max-width: 1120px; width: 100%; margin: 0 auto; }
+
+  /* ---- shared type ---- */
+  .eyebrow {
+    font-family: var(--mono); font-size: 13px; letter-spacing: .28em;
+    text-transform: uppercase; color: var(--accent);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .eyebrow::before { content: ""; width: 26px; height: 2px; background: var(--accent); }
+  h1 {
+    font-size: clamp(40px, 7vw, 86px); line-height: .98; letter-spacing: -.025em;
+    font-weight: 800; margin: 14px 0 0;
+  }
+  h2 {
+    font-size: clamp(28px, 4.4vw, 50px); line-height: 1.04; letter-spacing: -.02em;
+    font-weight: 800; margin: 12px 0 0;
+  }
+  .lead { font-size: clamp(17px, 2vw, 22px); line-height: 1.5; color: var(--muted); max-width: 60ch; margin-top: 18px; }
+  strong { color: var(--text); font-weight: 700; }
+  .accent { color: var(--accent); }
+  .mono { font-family: var(--mono); }
+
+  /* code chip */
+  code {
+    font-family: var(--mono); font-size: .92em;
+    background: var(--panel-2); border: 1px solid var(--line);
+    padding: 2px 8px; border-radius: 6px; color: #CBD5FF;
+  }
+
+  /* ---- title chips ---- */
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; }
+  .chip {
+    font-family: var(--mono); font-size: 13px; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px;
+    background: rgba(255,255,255,.02);
+  }
+
+  /* ---- two-column ---- */
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 28px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+    padding: 26px; display: flex; flex-direction: column; gap: 12px;
+  }
+  .card h3 { margin: 0; font-size: 14px; font-family: var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+  .card.human h3 { color: var(--text); }
+  .card.bot h3 { color: var(--accent); }
+  .card ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); line-height: 1.7; font-size: 16px; }
+  .card li::marker { color: var(--accent); }
+
+  /* ---- pipeline diagram ---- */
+  .pipe { margin-top: 30px; overflow-x: auto; padding-bottom: 10px; }
+  .track-row { display: flex; align-items: stretch; gap: 0; min-width: 880px; }
+  .node {
+    position: relative; flex: 1; min-width: 96px;
+    display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px;
+    padding: 0 6px;
+  }
+  .node .dot {
+    width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center;
+    background: var(--panel); border: 1.5px solid var(--line);
+    font-family: var(--mono); font-weight: 700; font-size: 17px; color: var(--text);
+    position: relative; z-index: 2;
+  }
+  /* connector line behind dots */
+  .node::after {
+    content: ""; position: absolute; top: 23px; left: 50%; width: 100%; height: 2px;
+    background: var(--line); z-index: 1;
+  }
+  .node:last-child::after { display: none; }
+  .node .label { font-size: 12.5px; line-height: 1.25; color: var(--muted); }
+  .node .who { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+
+  .node.claude .dot { border-color: var(--claude); color: var(--claude); box-shadow: 0 0 0 4px rgba(108,140,255,.10); }
+  .node.claude .who { color: var(--claude); }
+  .node.gpt .dot { border-color: var(--gpt); color: var(--gpt); box-shadow: 0 0 0 4px rgba(45,212,167,.10); }
+  .node.gpt .who { color: var(--gpt); }
+  .node.human .dot { border-color: var(--text); color: var(--text); }
+  .node.human .who { color: var(--text); }
+  .node.fail .dot { border-color: var(--fail); color: var(--fail); box-shadow: 0 0 0 4px rgba(242,85,90,.12); }
+  .node.fail .who { color: var(--fail); }
+  .node.pass .dot { border-color: var(--pass); color: var(--pass); box-shadow: 0 0 0 4px rgba(52,211,153,.14); }
+  .node.pass .who { color: var(--pass); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 18px 26px; margin-top: 26px; font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .swatch { width: 12px; height: 12px; border-radius: 4px; border: 1.5px solid; }
+
+  /* ---- step slides: big number + body ---- */
+  .step { display: grid; grid-template-columns: auto 1fr; gap: clamp(20px, 4vw, 56px); align-items: start; margin-top: 10px; }
+  .step .num { font-family: var(--mono); font-size: clamp(54px, 9vw, 120px); font-weight: 800; line-height: .8; color: var(--panel-2); -webkit-text-stroke: 1.5px var(--accent); }
+  .stack { display: flex; flex-direction: column; gap: 18px; }
+  .gate { display: inline-flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 14px; border-radius: 10px; padding: 9px 14px; border: 1px solid var(--line); width: fit-content; }
+  .gate.fail { color: var(--fail); border-color: rgba(242,85,90,.5); background: rgba(242,85,90,.07); }
+  .gate.pass { color: var(--pass); border-color: rgba(52,211,153,.5); background: rgba(52,211,153,.07); }
+  .gate b { color: inherit; }
+
+  .rows { display: flex; flex-direction: column; gap: 14px; margin-top: 8px; }
+  .rows .r { display: flex; gap: 14px; align-items: baseline; font-size: 17px; color: var(--muted); line-height: 1.5; }
+  .rows .r .k { font-family: var(--mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); min-width: 92px; flex-shrink: 0; padding-top: 3px; }
+
+  /* ---- benefit grid ---- */
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 28px; }
+  .ben { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px; }
+  .ben .t { font-weight: 700; font-size: 18px; margin: 4px 0 8px; }
+  .ben .d { color: var(--muted); font-size: 15px; line-height: 1.55; }
+  .ben .ic { font-family: var(--mono); color: var(--accent); font-size: 13px; letter-spacing: .1em; }
+
+  /* ---- closing ---- */
+  .big-cta { font-size: clamp(36px, 6vw, 72px); font-weight: 800; letter-spacing: -.02em; line-height: 1; }
+  .cmd { font-family: var(--mono); font-size: clamp(18px,2.4vw,26px); color: var(--gpt); margin-top: 22px; }
+  .cmd .caret { color: var(--muted); }
+
+  /* ---- animated token on the hero strip ---- */
+  .hero-strip { margin-top: 40px; position: relative; height: 56px; max-width: 760px; }
+  .hero-strip .rail { position: absolute; top: 27px; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--fail), var(--amber), var(--gpt), var(--pass)); opacity: .55; border-radius: 2px; }
+  .hero-strip .stops { display: flex; justify-content: space-between; position: relative; }
+  .hero-strip .stop { width: 14px; height: 14px; border-radius: 50%; background: var(--ground); border: 2px solid var(--line); margin-top: 20px; }
+  .token { position: absolute; top: 19px; left: 0; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 18px var(--accent); animation: run 6s cubic-bezier(.6,0,.4,1) infinite; }
+  @keyframes run { 0%{left:0} 50%{left:calc(100% - 18px)} 100%{left:0} }
+
+  /* ---- chrome: progress, dots, arrows, counter ---- */
+  .progress { position: fixed; top: 0; left: 0; height: 3px; background: var(--accent); z-index: 10; transition: width .4s ease; }
+  .dots { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); display: flex; gap: 9px; z-index: 10; }
+  .dots button { width: 8px; height: 8px; border-radius: 50%; border: 0; background: var(--line); cursor: pointer; padding: 0; transition: all .25s; }
+  .dots button.on { background: var(--accent); width: 22px; border-radius: 5px; }
+  .nav { position: fixed; bottom: 18px; z-index: 10; display: flex; gap: 8px; }
+  .nav.right { right: 22px; } .nav.left { left: 22px; }
+  .nav button {
+    font-family: var(--mono); font-size: 18px; width: 40px; height: 40px; border-radius: 10px;
+    background: var(--panel); color: var(--text); border: 1px solid var(--line); cursor: pointer;
+  }
+  .nav button:hover { border-color: var(--accent); color: var(--accent); }
+  .nav button:focus-visible, .dots button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .counter { position: fixed; top: 20px; right: 24px; z-index: 10; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+  .counter b { color: var(--text); }
+
+  @media (max-width: 720px) {
+    .cols, .grid3 { grid-template-columns: 1fr; }
+    .step { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .track { transition: none; }
+    .token { animation: none; }
+  }
+</style>
+
+<div class="bg"></div>
+<div class="progress" id="progress"></div>
+<div class="counter"><b id="cnum">01</b> / <span id="ctot">12</span></div>
+
+<div class="deck">
+  <div class="track" id="track">
+
+    <!-- SLIDE 1 · TITLE ---------------------------------------------------- -->
+    <section class="slide">
+      <div class="slide-inner">
+        <div class="eyebrow">AI-only delivery pipeline</div>
+        <h1>From one sentence<br>to <span class="accent">shipped.</span></h1>
+        <p class="lead">A person writes a behaviour spec. The pipeline writes the tests, writes the code, reviews itself, and ships — with deterministic CI as the only judge of what's true.</p>
+        <div class="hero-strip" aria-hidden="true">
+          <div class="rail"></div>
+          <div class="stops">
+            <span class="stop"></span><span class="stop"></span><span class="stop"></span>
+            <span class="stop"></span><span class="stop"></span><span class="stop"></span>
+          </div>
+          <div class="token"></div>
+        </div>
+        <div class="chips">
+          <span class="chip">GitHub Issues + Actions</span>
+          <span class="chip">BDD · Gherkin</span>
+          <span class="chip">Claude — builds</span>
+          <span class="chip">ChatGPT — reviews</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 2 · THE SHIFT ------------------------------------------------ -->
+    <section class="slide">
+      <div class="slide-inner">
+        <div class="eyebrow">The shift</div>
+        <h2>You describe <span class="accent">what.</span><br>The pipeline figures out <span class="accent">how.</span></h2>
+        <div class="cols">
+          <div class="card human">
+            <h3>The human owns</h3>
+            <ul>
+              <li>One capability, written as a BDD spec — Given / When / Then</li>
+              <li>Small and concrete enough to build and test as a single unit</li>
+              <li>The decision to start: a <code>@go-develop</code> comment</li>
+            </ul>
+          </div>
+          <div class="card bot">
+            <h3>The pipeline owns</h3>
+            <ul>
+              <li>Writing the tests, then the implementation</li>
+              <li>Running every test, reviewing the code, fixing the feedback</li>
+              <li>Resolving conflicts, merging, and deploying</li>
+            </ul>
+          </div>
+        </div>
+        <p class="lead">Engineers spend their attention on the <strong>intent</strong>, not the boilerplate.</p>
+      </div>
+    </section>
+
+    <!-- SLIDE 3 · THE PIPELINE (overview) --------------------------------- -->
+    <section class="slide">
+      <div class="slide-inner">
+        <div class="eyebrow">The line, end to end</div>
+        <h2>One spec in. A shipped, tested feature out.</h2>
+        <div class="pipe">
+          <div class="track-row">
+            <div class="node human"><div class="dot">✶</div><div class="who">Human</div><div class="label">Spec<br>(issue)</div></div>
+            <div class="node claude"><div class="dot">T</div><div class="who">Claude</div><div class="label">Generate<br>tests</div></div>
+            <div class="node fail"><div class="dot">✗</div><div class="who">CI gate</div><div class="label">Dry-run<br>must fail</div></div>
+            <div class="node gpt"><div class="dot">R</div><div class="who">ChatGPT</div><div class="label">Test<br>review</div></div>
+            <div class="node claude"><div class="dot">C</div><div class="who">Claude</div><div class="label">Write<br>code</div></div>
+            <div class="node pass"><div class="dot">✓</div><div class="who">CI gate</div><div class="label">Verify<br>must pass</div></div>
+            <div class="node gpt"><div class="dot">↺</div><div class="who">ChatGPT</div><div class="label">Code<br>review</div></div>
+            <div class="node pass"><div class="dot">⤓</div><div class="who">CI gate</div><div class="label">Merge<br>+ deploy</div></div>
+          </div>
+        </div>
+        <div class="legend">
+          <span><span class="swatch" style="border-color:var(--text)"></span> Human — writes the spec</span>
+          <span><span class="swatch" style="border-color:var(--claude)"></span> Claude — generates tests &amp; code</span>
+          <span><span class="swatch" style="border-color:var(--gpt)"></span> ChatGPT — reviews</span>
+          <span><span class="swatch" style="border-color:var(--pass)"></span> Deterministic CI — runs &amp; decides</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 4 · SPEC & GUARDRAIL ----------------------------------------- -->
+    <section class="slide">
+      <div class="slide-inner">
+        <div class="eyebrow">Steps 1–2 · Intake</div>
+        <div class="step">
+          <div class="num">01</div>
+          <div class="stack">
+            <h2>A spec is the contract.</h2>
+            <div class="rows">
+              <div class="r"><span class="k">File it</span><span>Open a GitHub issue from the <strong>BDD Spec</strong> template — a Gherkin <code>Feature</code> with Given / When / Then.</span></div>
+              <div class="r"><span class="k">Trigger</span><span>Comment <code>@go-develop</code> when it's ready. That one comment runs the whole pipeline.</span></div>
+              <div class="r"><span class="k">Guardrail</span><span>A deterministic check rejects vague specs and ones too big to test as a unit — and <strong>suggests how to split them</strong>.</span></div>
+            </div>
+            <p class="lead">Everything downstream is derived from this spec, so it has to be small, concrete, and checkable.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 5 · TESTS FIRST (RED) ---------------------------------------- -->
+    <section class="slide">
+      <div class="slide-inner">
+        <div class="eyebrow">Steps 3–4 · Tests first</div>
+        <div class="step">
+          <div class="num">02</div>
+          <div class="stack">
+            <h2>Write the tests. Watch them fail.</h2>
+            <div class="rows">
+              <div class="r"><span class="k">Generate</span><span>Claude turns the spec into executable tests and opens a <strong>draft</strong> PR — no implementation yet.</span></div>
+              <div class="r"><span class="k">Test QA</span><span>ChatGPT (the red team) checks the tests faithfully cover the spec.</span></div>
+            </div>
+            <div class="gate fail"><b>✗ Dry-run gate</b> — the tests <b>must fail</b> against the empty codebase</div>
+            <p class="lead">A failing dry-run is the proof the tests are real — that they can't silently auto-pass later.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 6 · IMPLEMENT (GREEN) ---------------------------------------- -->
+    <section class="slide">
+      <div class="slide-inner">
+        <div class="eyebrow">Steps 5–6 · Build to green</div>
+        <div class="step">
+          <div class="num">03</div>
+          <div class="stack">
+            <h2>Code until the tests pass.</h2>
+            <div class="rows">
+              <div class="r"><span class="k">Implement</span><span>Claude writes the minimal code to satisfy the failing tests, fed the real CI output each round.</span></div>
+              <div class="r"><span class="k">Authority</span><span>Claude never decides if it passed — it only generates. <strong>The CI runs the tests.</strong></span></div>
+            </div>
+            <div class="gate pass"><b>✓ Verify gate</b> — the tests <b>must pass</b>, then the PR leaves draft</div>
+            <p class="lead">Red, then green — proven by the machine, not claimed by the author.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 7 · REVIEW LOOP ---------------------------------------------- -->
+    <section class="slide">
+      <div class="slide-inner">
+        <div class="eyebrow">Steps 7–8 · Review</div>
+        <div class="step">
+          <div class="num">04</div>
+          <div class="stack">
+            <h2>Adversarial review, then approval.</h2>
+            <div class="rows">
+              <div class="r"><span class="k">Review</span><span>ChatGPT reviews the implementation and blocks <strong>only on real issues</strong> — correctness, security, spec. Polish is a suggestion.</span></div>
+              <div class="r"><span class="k">Address</span><span>Claude fixes the blocking points; the cycle repeats until the reviewer approves.</span></div>
+              <div class="r"><span class="k">Backstop</span><span>If it can't converge, it's capped and handed to a human — it never loops forever, and never merges unreviewed.</span></div>
+            </div>
+            <p class="lead">Two different models: one builds, one critiques. Neither grades its own homework.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 8 · SHIP ----------------------------------------------------- -->
+    <section class="slide">
+      <div class="slide-inner">
+        <div class="eyebrow">Step 9 · Ship</div>
+        <div class="step">
+          <div class="num">05</div>
+          <div class="stack">
+            <h2>It merges and deploys itself.</h2>
+            <div class="rows">
+              <div class="r"><span class="k">Approve</span><span>A formal approval is posted, the <strong>full CI suite</strong> runs one more time.</span></div>
+              <div class="r"><span class="k">Merge</span><span>Squash-merge to <code>main</code>; the originating issue closes automatically.</span></div>
+              <div class="r"><span class="k">Deploy</span><span>GitHub Pages redeploys the result. When <code>main</code> moves, open PRs <strong>auto-resync</strong> and re-verify.</span></div>
+            </div>
+            <p class="lead">From <code>@go-develop</code> to a live deploy — no human hands on the keyboard in between.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 9 · CORE PRINCIPLE ------------------------------------------- -->
+    <section class="slide">
+      <div class="slide-inner">
+        <div class="eyebrow">Why you can trust it</div>
+        <h2>AI <span class="accent">generates.</span><br>Deterministic CI <span class="accent">judges.</span></h2>
+        <p class="lead">The split is the whole point. The AI only ever produces artifacts — tests, code, fixes, reviews. Whether the tests pass or fail is decided by a plain test run, every time. The machine is never the judge of its own work, so "it looks done" can never stand in for "it is green."</p>
+        <div class="cols">
+          <div class="card bot"><h3>AI does</h3><ul><li>Generate tests from the spec</li><li>Generate code to pass them</li><li>Generate reviews &amp; fixes</li></ul></div>
+          <div class="card human"><h3>CI decides</h3><ul><li>Run the tests — must fail, then must pass</li><li>Run the full suite before merge</li><li>Resolve conflicts toward <code>main</code></li></ul></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 10 · BENEFITS ------------------------------------------------- -->
+    <section class="slide">
+      <div class="slide-inner">
+        <div class="eyebrow">What you get</div>
+        <h2>The payoff</h2>
+        <div class="grid3">
+          <div class="ben"><div class="ic">01</div><div class="t">Throughput</div><div class="d">Features move from spec to deploy on their own — in parallel, around the clock.</div></div>
+          <div class="ben"><div class="ic">02</div><div class="t">Focus</div><div class="d">People spend their time on intent and edge cases, not scaffolding and glue code.</div></div>
+          <div class="ben"><div class="ic">03</div><div class="t">Quality by construction</div><div class="d">Test-first, red→green proven, plus an independent adversarial review on every change.</div></div>
+          <div class="ben"><div class="ic">04</div><div class="t">Traceable</div><div class="d">Issue → PR → green CI → merge → deploy. Every step is logged and reviewable.</div></div>
+          <div class="ben"><div class="ic">05</div><div class="t">Self-healing</div><div class="d">When main moves, open work auto-rebases and re-verifies. No stuck branches.</div></div>
+          <div class="ben"><div class="ic">06</div><div class="t">Consistent</div><div class="d">Every feature follows the same gates. The bar doesn't drift on a busy day.</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 11 · GUARDRAILS ---------------------------------------------- -->
+    <section class="slide">
+      <div class="slide-inner">
+        <div class="eyebrow">Safety rails</div>
+        <h2>Autonomous, not unsupervised.</h2>
+        <div class="rows" style="margin-top:18px">
+          <div class="r"><span class="k">No auto-pass</span><span>Tests must fail before they're allowed to pass — bogus tests can't sneak through.</span></div>
+          <div class="r"><span class="k">Right-sized</span><span>The guardrail refuses specs too big to test as one unit and proposes a split.</span></div>
+          <div class="r"><span class="k">Real issues</span><span>Review blocks on correctness, security and spec — not taste — so it converges.</span></div>
+          <div class="r"><span class="k">Bounded</span><span>Every loop is capped; a stuck change is escalated to a human, never merged blind.</span></div>
+        </div>
+        <p class="lead">Humans step in at exactly two moments: <strong>writing the spec</strong>, and <strong>resolving a genuine stall</strong>.</p>
+      </div>
+    </section>
+
+    <!-- SLIDE 12 · CLOSE --------------------------------------------------- -->
+    <section class="slide">
+      <div class="slide-inner">
+        <div class="eyebrow">Get started</div>
+        <div class="big-cta">Describe it.<br>Let it <span class="accent">ship.</span></div>
+        <div class="cmd"><span class="caret">issue ›</span> @go-develop</div>
+        <p class="lead">Write the behaviour you want. The pipeline turns it into tested, reviewed, deployed code — and tells you the moment it needs you.</p>
+        <div class="chips">
+          <span class="chip">spec → tests → code → review → ship</span>
+          <span class="chip">deterministic gates</span>
+          <span class="chip">two AIs, one source of truth</span>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<div class="nav left"><button id="prev" aria-label="Previous slide">←</button></div>
+<div class="nav right"><button id="next" aria-label="Next slide">→</button></div>
+<div class="dots" id="dots" role="tablist" aria-label="Slides"></div>
+
+<script>
+  (function () {
+    var track = document.getElementById('track');
+    var slides = Array.prototype.slice.call(track.children);
+    var total = slides.length;
+    var i = 0;
+    var dotsWrap = document.getElementById('dots');
+    var progress = document.getElementById('progress');
+    var cnum = document.getElementById('cnum');
+    document.getElementById('ctot').textContent = String(total).padStart(2, '0');
+
+    slides.forEach(function (_, n) {
+      var b = document.createElement('button');
+      b.setAttribute('role', 'tab');
+      b.setAttribute('aria-label', 'Go to slide ' + (n + 1));
+      b.addEventListener('click', function () { go(n); });
+      dotsWrap.appendChild(b);
+    });
+    var dots = Array.prototype.slice.call(dotsWrap.children);
+
+    function go(n) {
+      i = Math.max(0, Math.min(total - 1, n));
+      track.style.transform = 'translateX(' + (-i * 100) + 'vw)';
+      dots.forEach(function (d, k) { d.classList.toggle('on', k === i); });
+      progress.style.width = ((i + 1) / total * 100) + '%';
+      cnum.textContent = String(i + 1).padStart(2, '0');
+    }
+    function next() { go(i + 1); }
+    function prev() { go(i - 1); }
+
+    document.getElementById('next').addEventListener('click', next);
+    document.getElementById('prev').addEventListener('click', prev);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); next(); }
+      else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); prev(); }
+      else if (e.key === 'Home') { go(0); } else if (e.key === 'End') { go(total - 1); }
+    });
+    // swipe (touch)
+    var x0 = null;
+    track.addEventListener('touchstart', function (e) { x0 = e.touches[0].clientX; }, { passive: true });
+    track.addEventListener('touchend', function (e) {
+      if (x0 === null) return;
+      var dx = e.changedTouches[0].clientX - x0;
+      if (Math.abs(dx) > 50) { dx < 0 ? next() : prev(); }
+      x0 = null;
+    });
+    window.addEventListener('resize', function () { go(i); });
+    go(0);
+  })();
+</script>
+</body>
+</html>
