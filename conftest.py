@@ -52,6 +52,24 @@ def card_exists_in_column(page, card_title, column_name):
 # for `{}` fields, so it cannot match empty strings.  These re-based steps
 # cover only the empty-string cases without conflicting with the parsers.parse
 # steps in the test files for non-empty values.
+@given(parsers.parse('I move the card "{card_title}" up in the "{column_name}" column'))
+def given_move_card_up(page, card_title, column_name):
+    column = page.locator(
+        ".column",
+        has=page.locator(".column-header", has_text=column_name),
+    )
+    card = column.locator(".card", has_text=card_title).first
+    move_up_button = card.locator(
+        "button.move-up, button[data-action='move-up'], button:has-text('↑'), button:has-text('Up'), button[aria-label='Move up']"
+    ).first
+    move_up_button.click()
+
+
+@when("I reload the page")
+def reload_page_shared(page):
+    page.reload()
+
+
 @when(parsers.re(r'I rename the card "(?P<card_title>[^"]+)" to ""'))
 def rename_card_to_empty(page, card_title):
     card = page.locator(".card", has_text=card_title).first
