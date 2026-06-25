@@ -203,10 +203,16 @@
 
     var rect = anchorEl.getBoundingClientRect();
     picker.style.position = 'fixed';
-    picker.style.top = rect.bottom + 'px';
     picker.style.left = rect.left + 'px';
+    picker.style.top = rect.bottom + 'px';
     picker.style.zIndex = '2000';
     document.body.appendChild(picker);
+
+    // Reposition above the anchor if the picker overflows the bottom of the viewport.
+    var pickerH = picker.offsetHeight;
+    if (rect.bottom + pickerH > window.innerHeight) {
+      picker.style.top = Math.max(0, rect.top - pickerH) + 'px';
+    }
 
     function closePicker() {
       if (picker.parentNode) picker.remove();
@@ -718,38 +724,49 @@
     draggedCard = null;
   });
 
+  var activeLabelFilter = null;
+
+  function applyFilters() {
+    var term = (document.getElementById('search') || {value: ''}).value.toLowerCase();
+    document.querySelectorAll(SELECTOR_CARD).forEach(function(card) {
+      var titleEl = card.querySelector('.card-title');
+      var title = titleEl ? titleEl.textContent.toLowerCase() : '';
+      var matchesSearch = !term || title.indexOf(term) !== -1;
+      var matchesLabel = !activeLabelFilter || card.querySelector('[data-color="' + activeLabelFilter + '"]') !== null;
+      card.style.display = (matchesSearch && matchesLabel) ? '' : 'none';
+    });
+  }
+
   var searchInput = document.getElementById('search');
   if (searchInput) {
-    searchInput.addEventListener('input', function() {
-      var term = searchInput.value.toLowerCase();
-      document.querySelectorAll(SELECTOR_CARD).forEach(function(card) {
-        var titleEl = card.querySelector('.card-title');
-        var title = titleEl ? titleEl.textContent.toLowerCase() : '';
-        card.style.display = (!term || title.indexOf(term) !== -1) ? '' : 'none';
+    searchInput.addEventListener('input', applyFilters);
+  }
+
+  var filterControls = document.getElementById('label-filter-controls');
+  if (filterControls) {
+    LABEL_COLORS.forEach(function(color) {
+      var btn = makeEl('button', {
+        className: 'filter-label-' + color,
+        type: 'button',
+        textContent: color
       });
+      btn.setAttribute('data-filter-label', color);
+      btn.addEventListener('click', function() {
+        activeLabelFilter = color;
+        applyFilters();
+      });
+      filterControls.appendChild(btn);
     });
-  }
 
-  var THEME_KEY = 'trello-lite-theme';
-
-  function applyTheme(theme) {
-    if (theme === 'dark') {
-      document.documentElement.setAttribute('data-theme', 'dark');
-    } else {
-      document.documentElement.removeAttribute('data-theme');
-    }
-  }
-
-  var savedTheme = localStorage.getItem(THEME_KEY);
-  if (savedTheme) applyTheme(savedTheme);
-
-  var themeToggle = document.getElementById('theme-toggle');
-  if (themeToggle) {
-    themeToggle.addEventListener('click', function() {
-      var current = document.documentElement.getAttribute('data-theme');
-      var next = current === 'dark' ? 'light' : 'dark';
-      applyTheme(next);
-      localStorage.setItem(THEME_KEY, next);
+    var clearBtn = makeEl('button', {
+      className: 'clear-label-filter',
+      type: 'button',
+      textContent: 'All'
     });
+    clearBtn.addEventListener('click', function() {
+      activeLabelFilter = null;
+      applyFilters();
+    });
+    filterControls.appendChild(clearBtn);
   }
 })();
