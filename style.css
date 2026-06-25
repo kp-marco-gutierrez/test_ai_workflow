@@ -246,3 +246,27 @@ button.label-btn:hover { background: #d0d8e0; }
 .label-option.label-purple { background: #c377e0; }
 .label-option.label-blue   { background: #0079bf; }
 .label-option.active { outline: 3px solid #333; outline-offset: -2px; }
+.filter-controls {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.filter-controls button {
+  border: none;
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #fff;
+  background: rgba(255,255,255,.25);
+}
+.filter-controls button:hover { background: rgba(255,255,255,.4); }
+.filter-controls .filter-label-green  { background: #61bd4f; }
+.filter-controls .filter-label-yellow { background: #d4b800; color: #333; }
+.filter-controls .filter-label-orange { background: #ff9f1a; }
+.filter-controls .filter-label-red    { background: #eb5a46; }
+.filter-controls .filter-label-purple { background: #c377e0; }
+.filter-controls .filter-label-blue   { background: #0079bf; }
+.filter-controls .clear-label-filter  { background: rgba(255,255,255,.2); }
