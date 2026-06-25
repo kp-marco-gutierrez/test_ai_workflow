@@ -1,4 +1,4 @@
-# test_ai_workflow
+# Trello-lite
 
 A Kanban-style project board that ships via a fully automated AI-assisted delivery pipeline.
 
