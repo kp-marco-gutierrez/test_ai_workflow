@@ -157,3 +157,22 @@ def move_card_to_column(page, card_title, target_column):
     card = page.locator(".card", has_text=card_title).first
     move_select = card.locator("select")
     move_select.select_option(label=target_column)
+
+
+@then(parsers.parse('the "{column_name}" column lists "{first_card}" before "{second_card}"'))
+def column_lists_card_before_other_shared(page, column_name, first_card, second_card):
+    column = page.locator(
+        ".column",
+        has=page.locator(".column-header", has_text=column_name),
+    )
+    cards = column.locator(".card")
+    count = cards.count()
+    titles = [cards.nth(i).inner_text() for i in range(count)]
+    first_indices = [i for i, t in enumerate(titles) if first_card in t]
+    second_indices = [i for i, t in enumerate(titles) if second_card in t]
+    assert first_indices, f'Card "{first_card}" not found in "{column_name}" column'
+    assert second_indices, f'Card "{second_card}" not found in "{column_name}" column'
+    assert first_indices[0] < second_indices[0], (
+        f'Expected "{first_card}" (index {first_indices[0]}) to appear before '
+        f'"{second_card}" (index {second_indices[0]}) in "{column_name}" column'
+    )

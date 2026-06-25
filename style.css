@@ -315,3 +315,25 @@ html[data-theme="dark"] #search {
   background: rgba(255,255,255,.15);
   color: #e0e0e0;
 }
+
+/* Responsive layout for small screens */
+@media screen and (max-width: 600px) {
+  header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  #search {
+    width: 100%;
+    min-width: 0;
+  }
+  .board-container {
+    flex-direction: column;
+    padding: 8px;
+    gap: 8px;
+  }
+  .column,
+  .add-list-section {
+    min-width: 0;
+    width: 100%;
+  }
+}
