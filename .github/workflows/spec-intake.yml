@@ -25,10 +25,13 @@ permissions:
 jobs:
   intake:
     name: Validate spec and generate tests
-    # Only on issue comments (not PR comments) that contain the trigger phrase.
+    # Only on issue comments (not PR comments) that contain the trigger phrase,
+    # and ONLY from the repo owner — the repo is public, so anyone could comment
+    # @go-develop; restrict who can launch the (autonomous, costly) pipeline.
     if: |
       github.event.issue.pull_request == null &&
-      contains(github.event.comment.body, '@go-develop')
+      contains(github.event.comment.body, '@go-develop') &&
+      github.event.comment.user.login == 'kp-marco-gutierrez'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
