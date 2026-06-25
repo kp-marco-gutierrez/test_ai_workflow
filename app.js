@@ -597,6 +597,16 @@
     var cardsList = makeEl('div', {className: 'cards-list'});
     col.appendChild(cardsList);
 
+    var emptyPlaceholder = makeEl('div', {className: 'empty-placeholder', textContent: 'No cards yet'});
+    cardsList.appendChild(emptyPlaceholder);
+
+    function updatePlaceholder() {
+      emptyPlaceholder.style.display = cardsList.querySelector(SELECTOR_CARD) ? 'none' : '';
+    }
+
+    var placeholderObserver = new MutationObserver(updatePlaceholder);
+    placeholderObserver.observe(cardsList, {childList: true});
+
     if (savedCards) {
       savedCards.forEach(function(item) {
         var t = typeof item === 'string' ? item : item.title;
@@ -608,6 +618,8 @@
       });
     }
     updateCardCount(col);
+
+    updatePlaceholder();
 
     var form = makeEl('div', {className: 'add-card-form'});
 
