@@ -448,9 +448,13 @@
 
     var header = makeEl('h2', {className: 'column-header'});
     var nameSpan = makeEl('span', {className: 'column-name', textContent: name});
+    var countWrapper = makeEl('span', {});
+    countWrapper.style.visibility = 'hidden';
     var countSpan = makeEl('span', {className: 'card-count', textContent: '0'});
+    countSpan.style.visibility = 'visible';
+    countWrapper.appendChild(countSpan);
     header.appendChild(nameSpan);
-    header.appendChild(countSpan);
+    header.appendChild(countWrapper);
     col.appendChild(header);
 
     var deleteBtn = makeEl('button', {
