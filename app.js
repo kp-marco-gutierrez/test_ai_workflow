@@ -7,6 +7,7 @@
   var SELECTOR_CARDS_LIST = '.cards-list';
   var DRAG_MIME_TYPE = 'text/plain';
   var MAX_CARD_TITLE_LENGTH = 50;
+  var LABEL_COLORS = ['green', 'yellow', 'orange', 'red', 'purple', 'blue'];
   var draggedCard = null;
 
   function sanitizeInput(value) {
@@ -72,7 +73,12 @@
       var colName = header.textContent;
       col.querySelectorAll(SELECTOR_CARD).forEach(function(card) {
         var titleEl = card.querySelector('.card-title');
-        if (titleEl) state[colName].push({ title: titleEl.textContent, complete: card.classList.contains('complete'), description: card.dataset.description || '' });
+        if (titleEl) {
+          var labelEls = card.querySelectorAll('.card-labels .label[data-color]');
+          var savedLabels = [];
+          for (var li = 0; li < labelEls.length; li++) { savedLabels.push(labelEls[li].dataset.color); }
+          state[colName].push({ title: titleEl.textContent, complete: card.classList.contains('complete'), description: card.dataset.description || '', labels: savedLabels });
+        }
       });
     });
     state._columns = COLUMNS.slice();
@@ -138,8 +144,72 @@
     descField.focus();
   }
 
-  function createCardEl(title, currentColumn, complete, cardDescription) {
+  function createLabelEl(color) {
+    var span = document.createElement('span');
+    span.className = 'label label-' + color;
+    span.dataset.color = color;
+    return span;
+  }
+
+  function showLabelPicker(labelsArea, labels, anchorEl, onDone) {
+    var existing = document.querySelector('.label-picker');
+    if (existing) { existing.remove(); return; }
+
+    var picker = document.createElement('div');
+    picker.className = 'label-picker';
+    picker.setAttribute('role', 'menu');
+
+    LABEL_COLORS.forEach(function(color) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.dataset.color = color;
+      btn.className = 'label-option label-' + color;
+      btn.textContent = color.charAt(0).toUpperCase() + color.slice(1);
+      if (labels.indexOf(color) !== -1) btn.classList.add('active');
+
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var idx = labels.indexOf(color);
+        if (idx !== -1) {
+          labels.splice(idx, 1);
+          var labelEl = labelsArea.querySelector('[data-color="' + color + '"]');
+          if (labelEl) labelEl.remove();
+        } else {
+          labels.push(color);
+          labelsArea.appendChild(createLabelEl(color));
+        }
+        closePicker();
+        onDone();
+      });
+
+      picker.appendChild(btn);
+    });
+
+    var rect = anchorEl.getBoundingClientRect();
+    picker.style.position = 'fixed';
+    picker.style.top = rect.bottom + 'px';
+    picker.style.left = rect.left + 'px';
+    picker.style.zIndex = '2000';
+    document.body.appendChild(picker);
+
+    function closePicker() {
+      if (picker.parentNode) picker.remove();
+      document.removeEventListener('click', handleOutside, true);
+    }
+
+    function handleOutside(e) {
+      if (!picker.contains(e.target) && e.target !== anchorEl) {
+        closePicker();
+      }
+    }
+    setTimeout(function() {
+      document.addEventListener('click', handleOutside, true);
+    }, 0);
+  }
+
+  function createCardEl(title, currentColumn, complete, cardDescription, cardLabels) {
     var description = cardDescription || '';
+    var labels = cardLabels ? cardLabels.slice() : [];
     var card = makeEl('div', {className: complete ? 'card complete' : 'card'});
     card.dataset.description = description;
 
@@ -218,8 +288,19 @@
       }
     });
 
+    var labelsArea = makeEl('div', {className: 'card-labels'});
+    labels.forEach(function(color) { labelsArea.appendChild(createLabelEl(color)); });
+
+    var labelBtn = makeEl('button', {className: 'label-btn', type: 'button', textContent: 'Label'});
+    labelBtn.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+    labelBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      showLabelPicker(labelsArea, labels, labelBtn, saveBoard);
+    });
+
     var titleSpan = makeEl('span', {className: 'card-title', textContent: title});
     card.appendChild(checkbox);
+    card.appendChild(labelsArea);
     card.appendChild(titleSpan);
 
     titleSpan.addEventListener('dblclick', function() {
@@ -302,6 +383,7 @@
 
     card.appendChild(select);
     card.appendChild(openBtn);
+    card.appendChild(labelBtn);
     card.appendChild(moveUpBtn);
     card.appendChild(moveDownBtn);
     card.appendChild(deleteBtn);
@@ -446,7 +528,8 @@
         var t = typeof item === 'string' ? item : item.title;
         var c = typeof item === 'string' ? false : !!item.complete;
         var d = typeof item === 'string' ? '' : (item.description || '');
-        cardsList.appendChild(createCardEl(t, name, c, d));
+        var l = typeof item === 'string' ? [] : (item.labels || []);
+        cardsList.appendChild(createCardEl(t, name, c, d, l));
       });
     }
 

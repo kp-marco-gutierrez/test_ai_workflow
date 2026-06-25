@@ -183,3 +183,56 @@ button.modal-close {
   font-size: 0.875rem;
 }
 button.modal-close:hover { background: #bdbdbd; }
+.card-labels { display: flex; flex-wrap: wrap; gap: 4px; min-height: 0; }
+.label {
+  display: inline-block;
+  height: 8px;
+  width: 40px;
+  border-radius: 3px;
+  font-size: 0px;
+}
+.label-green  { background: #61bd4f; }
+.label-yellow { background: #f2d600; }
+.label-orange { background: #ff9f1a; }
+.label-red    { background: #eb5a46; }
+.label-purple { background: #c377e0; }
+.label-blue   { background: #0079bf; }
+button.label-btn {
+  background: #e8ecf0;
+  border: none;
+  border-radius: 3px;
+  padding: 3px 8px;
+  color: #333;
+  cursor: pointer;
+  font-size: 0.75rem;
+  align-self: flex-start;
+}
+button.label-btn:hover { background: #d0d8e0; }
+.label-picker {
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.2);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 120px;
+}
+.label-option {
+  border: none;
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #fff;
+  text-align: left;
+  font-weight: 500;
+}
+.label-option.label-green  { background: #61bd4f; }
+.label-option.label-yellow { background: #d4b800; color: #333; }
+.label-option.label-orange { background: #ff9f1a; }
+.label-option.label-red    { background: #eb5a46; }
+.label-option.label-purple { background: #c377e0; }
+.label-option.label-blue   { background: #0079bf; }
+.label-option.active { outline: 3px solid #333; outline-offset: -2px; }
