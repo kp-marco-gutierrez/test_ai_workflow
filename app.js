@@ -426,7 +426,8 @@
   function createColumnEl(name, savedCards) {
     var col = makeEl('div', {className: 'column'});
 
-    var header = makeEl('h2', {className: 'column-header', textContent: name});
+    var accentSlug = name.toLowerCase().replace(/\s+/g, '');
+    var header = makeEl('h2', {className: 'column-header accent-' + accentSlug, textContent: name});
     col.appendChild(header);
 
     var deleteBtn = makeEl('button', {
