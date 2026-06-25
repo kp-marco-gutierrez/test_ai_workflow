@@ -455,6 +455,20 @@
     });
     col.appendChild(moveRightBtn);
 
+    var clearCompletedBtn = makeEl('button', {
+      className: 'clear-completed',
+      type: 'button',
+      textContent: 'Clear completed'
+    });
+    clearCompletedBtn.setAttribute('aria-label', 'Clear completed cards');
+    clearCompletedBtn.addEventListener('click', function() {
+      col.querySelectorAll(SELECTOR_CARD + '.complete').forEach(function(card) {
+        card.remove();
+      });
+      saveBoard();
+    });
+    col.appendChild(clearCompletedBtn);
+
     header.addEventListener('dblclick', function() {
       var currentName = header.textContent;
 
