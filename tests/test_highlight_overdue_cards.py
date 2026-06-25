@@ -45,30 +45,22 @@ def board_loads(page):
     page.wait_for_load_state("networkidle")
 
 
-@then(parsers.parse('the card "{card_title}" is marked overdue'))
-def card_is_marked_overdue(page, card_title):
+@then(parsers.parse('the card "{card_title}" has the "{css_class}" CSS class'))
+def card_has_css_class(page, card_title, css_class):
     card = page.locator(".card", has_text=card_title).first
     card.wait_for(state="visible", timeout=5000)
-    # The card must carry an overdue indicator — either a CSS class or a data attribute
-    overdue_class = card.evaluate(
-        "el => el.classList.contains('overdue') || el.classList.contains('past-due') || "
-        "el.getAttribute('data-overdue') === 'true' || "
-        "el.querySelector('.overdue, .past-due, [data-overdue]') !== null"
-    )
-    assert overdue_class, (
-        f'Expected card "{card_title}" to be marked overdue, but no overdue indicator was found'
+    has_class = card.evaluate(f"el => el.classList.contains('{css_class}')")
+    assert has_class, (
+        f'Expected card "{card_title}" to have CSS class "{css_class}", but it was absent'
     )
 
 
-@then(parsers.parse('the card "{card_title}" is not marked overdue'))
-def card_is_not_marked_overdue(page, card_title):
+@then(parsers.parse('the card "{card_title}" is visible and does not have the "{css_class}" CSS class'))
+def card_is_visible_without_css_class(page, card_title, css_class):
     card = page.locator(".card", has_text=card_title).first
     card.wait_for(state="visible", timeout=5000)
-    overdue_class = card.evaluate(
-        "el => el.classList.contains('overdue') || el.classList.contains('past-due') || "
-        "el.getAttribute('data-overdue') === 'true' || "
-        "el.querySelector('.overdue, .past-due, [data-overdue]') !== null"
-    )
-    assert not overdue_class, (
-        f'Expected card "{card_title}" to NOT be marked overdue, but an overdue indicator was found'
+    assert card.is_visible(), f'Expected card "{card_title}" to be visible'
+    has_class = card.evaluate(f"el => el.classList.contains('{css_class}')")
+    assert not has_class, (
+        f'Expected card "{card_title}" to NOT have CSS class "{css_class}", but it was present'
     )
