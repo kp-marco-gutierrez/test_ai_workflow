@@ -55,6 +55,14 @@
     input.addEventListener('blur', blurAction === 'confirm' ? doConfirm : doCancel);
   }
 
+  function syncColumnsFromDOM() {
+    COLUMNS = [];
+    document.querySelectorAll(SELECTOR_COLUMN).forEach(function(col) {
+      var header = col.querySelector(SELECTOR_COLUMN_HEADER);
+      if (header) COLUMNS.push(header.textContent);
+    });
+  }
+
   function saveBoard() {
     var state = {};
     COLUMNS.forEach(function(name) { state[name] = []; });
@@ -319,6 +327,38 @@
       saveBoard();
     });
     col.appendChild(deleteBtn);
+
+    var moveLeftBtn = makeEl('button', {
+      className: 'move-left',
+      type: 'button',
+      textContent: '←'
+    });
+    moveLeftBtn.setAttribute('aria-label', 'Move list left');
+    moveLeftBtn.addEventListener('click', function() {
+      var prev = col.previousElementSibling;
+      if (prev && prev.classList.contains('column')) {
+        col.parentNode.insertBefore(col, prev);
+        syncColumnsFromDOM();
+        saveBoard();
+      }
+    });
+    col.appendChild(moveLeftBtn);
+
+    var moveRightBtn = makeEl('button', {
+      className: 'move-right',
+      type: 'button',
+      textContent: '→'
+    });
+    moveRightBtn.setAttribute('aria-label', 'Move list right');
+    moveRightBtn.addEventListener('click', function() {
+      var next = col.nextElementSibling;
+      if (next && next.classList.contains('column')) {
+        col.parentNode.insertBefore(next, col);
+        syncColumnsFromDOM();
+        saveBoard();
+      }
+    });
+    col.appendChild(moveRightBtn);
 
     header.addEventListener('dblclick', function() {
       var currentName = header.textContent;
