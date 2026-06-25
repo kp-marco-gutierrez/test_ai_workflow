@@ -236,11 +236,29 @@
     }, 0);
   }
 
+  function isOverdue(dateStr) {
+    if (!dateStr) return false;
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return new Date(dateStr) < today;
+  }
+
+  function applyOverdueClass(card, dateStr) {
+    if (isOverdue(dateStr)) {
+      card.classList.add('overdue');
+    } else {
+      card.classList.remove('overdue');
+    }
+  }
+
   function createCardEl(title, currentColumn, complete, cardDescription, cardLabels, cardDueDate) {
     var description = cardDescription || '';
     var labels = cardLabels ? cardLabels.slice() : [];
     var dueDate = cardDueDate || '';
-    var card = makeEl('div', {className: complete ? 'card complete' : 'card'});
+    var className = 'card';
+    if (complete) className += ' complete';
+    if (isOverdue(dueDate)) className += ' overdue';
+    var card = makeEl('div', {className: className});
     card.dataset.description = description;
     card.dataset.dueDate = dueDate;
 
@@ -393,6 +411,7 @@
         dueDate = newDueDate;
         card.dataset.dueDate = newDueDate;
         dueDateSpan.textContent = newDueDate;
+        applyOverdueClass(card, newDueDate);
         saveBoard();
       });
     });
@@ -409,6 +428,7 @@
           dueDate = newDueDate;
           card.dataset.dueDate = newDueDate;
           dueDateSpan.textContent = newDueDate;
+          applyOverdueClass(card, newDueDate);
           saveBoard();
         });
       }, 300);
