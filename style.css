@@ -12,7 +12,7 @@ h1 { font-size: 1.25rem; font-weight: 700; }
   background: rgba(255,255,255,.9);
   color: #333;
 }
-.board-container { display: flex; gap: 12px; padding: 16px; }
+.board-container { display: flex; gap: 12px; padding: 16px; max-width: 100%; overflow-x: auto; }
 .column {
   background: rgba(255,255,255,.15);
   border-radius: 6px;
