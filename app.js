@@ -110,6 +110,7 @@
       if (saved) return JSON.parse(saved);
     } catch (e) {
       console.warn('Failed to load saved board state:', e);
+      localStorage.removeItem(STORAGE_KEY);
       return { _corrupt: true };
     }
     return null;
@@ -188,13 +189,22 @@
     picker.className = 'label-picker';
     picker.setAttribute('role', 'menu');
 
+    var hint = document.createElement('p');
+    hint.className = 'label-picker-hint';
+    hint.textContent = 'Click to toggle labels';
+    picker.appendChild(hint);
+
     LABEL_COLORS.forEach(function(color) {
       var btn = document.createElement('button');
       btn.type = 'button';
       btn.dataset.color = color;
       btn.className = 'label-option label-' + color;
       btn.textContent = color.charAt(0).toUpperCase() + color.slice(1);
-      if (labels.indexOf(color) !== -1) btn.classList.add('active');
+      var isActive = labels.indexOf(color) !== -1;
+      if (isActive) btn.classList.add('active');
+      btn.setAttribute('aria-pressed', String(isActive));
+      btn.setAttribute('role', 'menuitemcheckbox');
+      btn.setAttribute('aria-label', color.charAt(0).toUpperCase() + color.slice(1) + ' label');
 
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
@@ -302,8 +312,7 @@
       saveBoard();
     });
 
-    var deleteBtn = makeCardBtn('delete', 'Delete', null, function() {
-      var col = card.closest(SELECTOR_COLUMN);
+    var deleteBtn = makeCardBtn('delete', 'Delete', 'Delete card', function() {
       card.remove();
       if (col) updateCardCount(col);
       saveBoard();
@@ -649,16 +658,19 @@
 
     function addCard() {
       errorEl.classList.remove('visible');
+      input.classList.remove('input-error');
       var title = sanitizeInput(input.value);
       if (!title) {
         errorEl.textContent = 'Card title cannot be empty';
         errorEl.classList.add('visible');
+        input.classList.add('input-error');
         input.focus();
         return;
       }
       if (title.length > MAX_CARD_TITLE_LENGTH) {
         errorEl.textContent = 'Card title cannot exceed ' + MAX_CARD_TITLE_LENGTH + ' characters';
         errorEl.classList.add('visible');
+        input.classList.add('input-error');
         input.focus();
         return;
       }
@@ -674,6 +686,7 @@
     });
     input.addEventListener('input', function() {
       errorEl.classList.remove('visible');
+      input.classList.remove('input-error');
     });
 
     return col;
@@ -728,10 +741,12 @@
     var listName = sanitizeInput(addListInput.value);
     if (!listName) {
       addListError.classList.add('visible');
+      addListInput.classList.add('input-error');
       addListInput.focus();
       return;
     }
     addListError.classList.remove('visible');
+    addListInput.classList.remove('input-error');
     COLUMNS.push(listName);
     board.appendChild(createColumnEl(listName, []));
     addListInput.value = '';
@@ -744,6 +759,7 @@
   });
   addListInput.addEventListener('input', function() {
     addListError.classList.remove('visible');
+    addListInput.classList.remove('input-error');
   });
 
   // Global cleanup: clear draggedCard if mouse released outside any column.
