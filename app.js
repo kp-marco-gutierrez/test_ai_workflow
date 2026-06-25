@@ -452,15 +452,8 @@
   function createColumnEl(name, savedCards) {
     var col = makeEl('div', {className: 'column'});
 
-    var header = makeEl('h2', {className: 'column-header'});
-    var nameSpan = makeEl('span', {className: 'column-name', textContent: name});
-    var countWrapper = makeEl('span', {});
-    countWrapper.style.visibility = 'hidden';
-    var countSpan = makeEl('span', {className: 'card-count', textContent: '0'});
-    countSpan.style.visibility = 'visible';
-    countWrapper.appendChild(countSpan);
-    header.appendChild(nameSpan);
-    header.appendChild(countWrapper);
+    var accentSlug = name.toLowerCase().replace(/\s+/g, '');
+    var header = makeEl('h2', {className: 'column-header accent-' + accentSlug, textContent: name});
     col.appendChild(header);
 
     var deleteBtn = makeEl('button', {
