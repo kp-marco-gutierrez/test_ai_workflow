@@ -24,6 +24,16 @@
     return el;
   }
 
+  // Utility: create a button that stops mousedown propagation (prevents card drag
+  // from firing when interacting with card controls) and attaches a click handler.
+  function makeCardBtn(className, text, ariaLabel, onClick) {
+    var btn = makeEl('button', {className: className, type: 'button', textContent: text});
+    if (ariaLabel) btn.setAttribute('aria-label', ariaLabel);
+    btn.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+    if (onClick) btn.addEventListener('click', onClick);
+    return btn;
+  }
+
   // Wire keyboard and blur handlers for an inline rename <input>.
   //   onConfirm(newValue) – called on Enter; return false to abort (keep input open).
   //   onCancel()          – called on Escape or blur when blurAction is 'cancel'.
@@ -54,6 +64,14 @@
     });
 
     input.addEventListener('blur', blurAction === 'confirm' ? doConfirm : doCancel);
+  }
+
+  function syncColumnsFromDOM() {
+    COLUMNS = [];
+    document.querySelectorAll(SELECTOR_COLUMN).forEach(function(col) {
+      var header = col.querySelector(SELECTOR_COLUMN_HEADER);
+      if (header) COLUMNS.push(header.textContent);
+    });
   }
 
   function saveBoard() {
@@ -106,7 +124,7 @@
     var modal = makeEl('div', {className: 'card-modal'});
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
-    modal.setAttribute('aria-label', cardTitle);
+    modal.setAttribute('aria-label', sanitizeInput(cardTitle));
 
     var titleEl = makeEl('h3', {textContent: cardTitle});
     var descLabel = makeEl('label', {textContent: 'Description'});
@@ -247,25 +265,12 @@
       saveBoard();
     });
 
-    var deleteBtn = makeEl('button', {
-      className: 'delete',
-      type: 'button',
-      textContent: 'Delete'
-    });
-    deleteBtn.addEventListener('mousedown', function(e) { e.stopPropagation(); });
-    deleteBtn.addEventListener('click', function() {
+    var deleteBtn = makeCardBtn('delete', 'Delete', null, function() {
       card.remove();
       saveBoard();
     });
 
-    var moveUpBtn = makeEl('button', {
-      className: 'move-up',
-      type: 'button',
-      textContent: '↑'
-    });
-    moveUpBtn.setAttribute('aria-label', 'Move up');
-    moveUpBtn.addEventListener('mousedown', function(e) { e.stopPropagation(); });
-    moveUpBtn.addEventListener('click', function() {
+    var moveUpBtn = makeCardBtn('move-up', '↑', 'Move up', function() {
       var prev = card.previousElementSibling;
       if (prev) {
         card.parentNode.insertBefore(card, prev);
@@ -273,14 +278,7 @@
       }
     });
 
-    var moveDownBtn = makeEl('button', {
-      className: 'move-down',
-      type: 'button',
-      textContent: '↓'
-    });
-    moveDownBtn.setAttribute('aria-label', 'Move down');
-    moveDownBtn.addEventListener('mousedown', function(e) { e.stopPropagation(); });
-    moveDownBtn.addEventListener('click', function() {
+    var moveDownBtn = makeCardBtn('move-down', '↓', 'Move down', function() {
       var next = card.nextElementSibling;
       if (next) {
         card.parentNode.insertBefore(next, card);
@@ -367,14 +365,7 @@
       }
     });
 
-    var openBtn = makeEl('button', {
-      className: 'open-card',
-      type: 'button',
-      textContent: 'Open'
-    });
-    openBtn.setAttribute('aria-label', 'Open card');
-    openBtn.addEventListener('mousedown', function(e) { e.stopPropagation(); });
-    openBtn.addEventListener('click', function(e) {
+    var openBtn = makeCardBtn('open-card', 'Open', 'Open card', function(e) {
       e.stopPropagation();
       showCardModal(title, description, dueDate, function(newDesc, newDueDate) {
         description = newDesc;
@@ -431,6 +422,38 @@
       saveBoard();
     });
     col.appendChild(deleteBtn);
+
+    var moveLeftBtn = makeEl('button', {
+      className: 'move-left',
+      type: 'button',
+      textContent: '←'
+    });
+    moveLeftBtn.setAttribute('aria-label', 'Move list left');
+    moveLeftBtn.addEventListener('click', function() {
+      var prev = col.previousElementSibling;
+      if (prev && prev.classList.contains('column')) {
+        col.parentNode.insertBefore(col, prev);
+        syncColumnsFromDOM();
+        saveBoard();
+      }
+    });
+    col.appendChild(moveLeftBtn);
+
+    var moveRightBtn = makeEl('button', {
+      className: 'move-right',
+      type: 'button',
+      textContent: '→'
+    });
+    moveRightBtn.setAttribute('aria-label', 'Move list right');
+    moveRightBtn.addEventListener('click', function() {
+      var next = col.nextElementSibling;
+      if (next && next.classList.contains('column')) {
+        col.parentNode.insertBefore(next, col);
+        syncColumnsFromDOM();
+        saveBoard();
+      }
+    });
+    col.appendChild(moveRightBtn);
 
     header.addEventListener('dblclick', function() {
       var currentName = header.textContent;
@@ -555,11 +578,13 @@
       if (!title) {
         errorEl.textContent = 'Card title cannot be empty';
         errorEl.classList.add('visible');
+        input.focus();
         return;
       }
       if (title.length > MAX_CARD_TITLE_LENGTH) {
         errorEl.textContent = 'Card title cannot exceed ' + MAX_CARD_TITLE_LENGTH + ' characters';
         errorEl.classList.add('visible');
+        input.focus();
         return;
       }
       errorEl.classList.remove('visible');
@@ -628,6 +653,7 @@
     var listName = sanitizeInput(addListInput.value);
     if (!listName) {
       addListError.classList.add('visible');
+      addListInput.focus();
       return;
     }
     addListError.classList.remove('visible');
@@ -647,6 +673,14 @@
 
   // Global cleanup: clear draggedCard if mouse released outside any column.
   document.addEventListener('mouseup', function() {
+    draggedCard = null;
+  });
+
+  // Clear stale drag state when the pointer leaves the browser window.
+  // Without this, releasing the mouse outside the window skips the mouseup
+  // event entirely, leaving draggedCard set and causing an unintended drop
+  // on the next in-window interaction.
+  document.addEventListener('mouseleave', function() {
     draggedCard = null;
   });
 })();
